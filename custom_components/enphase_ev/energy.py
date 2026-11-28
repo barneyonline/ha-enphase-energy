@@ -1341,11 +1341,11 @@ class EnergyManager:
             )
             recovery = None
             if power is not None:
+                assert directional_source is not None
                 power_totals = self._directional_battery_totals(
                     payload, directional_source, for_power=True
                 )
                 if power_totals:
-                    assert directional_source is not None
                     power.observe(
                         payload,
                         directional_source,
@@ -1354,7 +1354,14 @@ class EnergyManager:
                         self._coerce_lifetime_bucket,
                         startup=self._directional_battery.power_startup_reference(),
                     )
-                    recovery = power.recovery_checkpoint(directional_source)
+                else:
+                    power.reject_report(
+                        directional_source,
+                        self._directional_battery.power_startup_for_rejected_report(
+                            payload.get("start_date")
+                        ),
+                    )
+                recovery = power.recovery_checkpoint(directional_source)
             if directional_totals or recovery is not None:
                 self._directional_battery_save_idle.clear()
                 try:

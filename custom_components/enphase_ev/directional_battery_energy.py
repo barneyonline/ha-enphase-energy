@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
 from sys import float_info
@@ -145,6 +145,7 @@ class DirectionalBatteryRecovery:
     """The latest source cursor and each independently trusted pair."""
 
     reported_at: datetime
+    bucket_count: int
     pairs: dict[str, DirectionalBatteryPairReference]
 
 
@@ -217,7 +218,7 @@ class _PowerCheckpoint:
             zone_name,
             size,
             signature,
-            DirectionalBatteryRecovery(reported_at, pairs),
+            DirectionalBatteryRecovery(reported_at, size, pairs),
         )
 
 
@@ -359,14 +360,17 @@ class DirectionalBatteryEnergy:
         checkpoint = self._saved_power_checkpoint
         power_source = self._power_source_history
         if recovery is not None:
-            assert power_source is not None
-            checkpoint = _PowerCheckpoint(
-                power_source.start.isoformat(),
-                power_source.timezone,
-                power_source.size,
-                _closed_signature(power_source, power_source.size),
-                recovery,
-            )
+            if power_source is None:
+                assert checkpoint is not None
+                checkpoint = replace(checkpoint, recovery=recovery)
+            else:
+                checkpoint = _PowerCheckpoint(
+                    power_source.start.isoformat(),
+                    power_source.timezone,
+                    recovery.bucket_count,
+                    _closed_signature(power_source, recovery.bucket_count),
+                    recovery,
+                )
         if (
             self._store is None
             or history is None
@@ -485,6 +489,7 @@ class DirectionalBatteryEnergy:
         }
         return DirectionalBatteryRecovery(
             saved.reported_at,
+            saved.size,
             {
                 aggregate: DirectionalBatteryPairReference(
                     saved.reported_at,
@@ -493,6 +498,19 @@ class DirectionalBatteryEnergy:
                 for aggregate, fields in _AGGREGATE_PAIRS.items()
             },
         )
+
+    def power_startup_for_rejected_report(
+        self, start: object
+    ) -> DirectionalBatteryRecovery | None:
+        """Reuse a known source checkpoint without trusting a rejected payload."""
+        checkpoint = self._saved_power_checkpoint
+        if (
+            checkpoint is None
+            or start != checkpoint.start
+            or self._zone_name != checkpoint.timezone
+        ):
+            return None
+        return checkpoint.recovery
 
     def _evaluate(
         self,

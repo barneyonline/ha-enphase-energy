@@ -690,7 +690,9 @@ fall below that report, the group waits for a reconciled recovery to its
 pre-drop levels before reseeding. An implausible advance or an unmatched
 increase keeps the original time allowance while the pair waits for a
 reconciled, plausible report. This check uses the same five-minute minimum
-window as the estimator.
+window as the estimator. A fresh report with unusable counters can preserve
+that time allowance through a reload without contributing any raw counters
+or watts.
 Site-local day rollover seeds a new power baseline even if the closing bucket
 was revised. The group's qualification and both power readings participate in
 coordinator snapshot equality. Each entity uses the group's source timestamp

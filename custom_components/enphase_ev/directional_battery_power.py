@@ -60,6 +60,8 @@ class DirectionalBatteryPower:
         self._minimum_window_seconds = minimum_window_seconds
         self._baseline: _Report | None = None
         self._last_report: _Report | None = None
+        self._source_cursor: datetime | None = None
+        self._recovery_size: int | None = None
         self._recovery_references: dict[str, DirectionalBatteryPairReference] = {}
         self._validators = {field: ExtremePowerValidator() for field in _FIELDS}
         self._averages = {field: EnergyPowerAverage() for field in _FIELDS}
@@ -79,6 +81,29 @@ class DirectionalBatteryPower:
         self.interval = self._next_interval
         self.average = self._next_average
         self.qualified |= self.interval is not None
+
+    def reject_report(
+        self, reported_at: datetime, startup: DirectionalBatteryRecovery | None = None
+    ) -> None:
+        """Retain the first unavailable interval without trusting its counters."""
+        self._reset_window()
+        if self._recovery_size is None:
+            if startup is None:
+                return
+            self._recovery_references = startup.pairs.copy()
+            self._recovery_size = startup.bucket_count
+            self._source_cursor = startup.reported_at
+        if self._source_cursor is not None and reported_at <= self._source_cursor:
+            return
+        self._source_cursor = reported_at
+        for aggregate, reference in self._recovery_references.items():
+            elapsed = (reported_at - reference.reported_at).total_seconds()
+            self._recovery_references[aggregate] = replace(
+                reference,
+                max_elapsed_seconds=_allowed_elapsed(
+                    elapsed, reference.max_elapsed_seconds, self._minimum_window_seconds
+                ),
+            )
 
     def _reset_window(self) -> None:
         self._baseline = None
@@ -111,7 +136,7 @@ class DirectionalBatteryPower:
                 or isinstance(raw := buckets[bucket_count - 1], bool)
                 or (value := coerce_bucket(raw)) is None
             ):
-                self._reset_window()
+                self.reject_report(reported_at, startup)
                 return
             wh[field] = value
         self._observe(
@@ -129,14 +154,22 @@ class DirectionalBatteryPower:
         startup: DirectionalBatteryRecovery | None,
     ) -> None:
         previous = self._last_report
-        if previous is not None and report.reported_at <= previous.reported_at:
+        if (
+            self._source_cursor is not None
+            and report.reported_at <= self._source_cursor
+        ):
             if report != previous:
                 self._reset_window()
             return
+        self._source_cursor = report.reported_at
         self._last_report = report
-        rollover = previous is not None and report.bucket_count != previous.bucket_count
+        rollover = (
+            self._recovery_size is not None
+            and report.bucket_count != self._recovery_size
+        )
         if rollover:
             self._recovery_references.clear()
+        self._recovery_size = report.bucket_count
         self._track_recovery(report, totals, startup if previous is None else None)
         if any(reference.held for reference in self._recovery_references.values()):
             self._reset_window()
@@ -260,11 +293,10 @@ class DirectionalBatteryPower:
         self, reported_at: datetime
     ) -> DirectionalBatteryRecovery | None:
         """Checkpoint the raw source cursor and recovery state without watts."""
-        report = self._last_report
-        if report is None or report.reported_at != reported_at:
+        if self._recovery_size is None or reported_at != self._source_cursor:
             return None
         return DirectionalBatteryRecovery(
-            report.reported_at, self._recovery_references.copy()
+            reported_at, self._recovery_size, self._recovery_references.copy()
         )
 
 
@@ -293,25 +325,28 @@ def _advance_pair_reference(
     elapsed = (report.reported_at - reference.reported_at).total_seconds()
     if elapsed <= 0:
         return replace(reference, held=held)
-    allowed_elapsed = max(
-        minimum_window_seconds,
-        (
-            elapsed
-            if reference.max_elapsed_seconds is None
-            else min(elapsed, reference.max_elapsed_seconds)
-        ),
+    allowed_elapsed = _allowed_elapsed(
+        elapsed, reference.max_elapsed_seconds, minimum_window_seconds
     )
     if not _counter_advances_are_plausible(deltas, allowed_elapsed, fields, totals):
         # The directional jump is visible even while the direct aggregate
         # lags. Retain this time allowance until the jump is resolved.
         return replace(reference, held=held, max_elapsed_seconds=allowed_elapsed)
-    if any(delta < 0 for delta in deltas.values()):
-        return replace(reference, held=held)
-    if aggregate in deltas and not _pair_deltas_reconcile(deltas, aggregate, fields):
+    if (
+        any(delta > 0 for delta in deltas.values())
+        and aggregate in deltas
+        and not _pair_deltas_reconcile(deltas, aggregate, fields)
+    ):
         # Some counters have advanced and their partners have yet to agree.
         # Keep the first observed interval when evaluating a later catch-up.
         return replace(reference, held=held, max_elapsed_seconds=allowed_elapsed)
+    if any(delta < 0 for delta in deltas.values()):
+        return replace(reference, held=held)
     return _pair_reference(report, aggregate, fields)
+
+
+def _allowed_elapsed(elapsed: float, maximum: float | None, minimum: float) -> float:
+    return max(minimum, elapsed if maximum is None else min(elapsed, maximum))
 
 
 def _confirm_pair_revision(

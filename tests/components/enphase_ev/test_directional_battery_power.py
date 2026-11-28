@@ -418,7 +418,7 @@ def test_implausible_recovery_preserves_restart_watermark(replay):
     }
     saved_at = _START - timedelta(minutes=5)
     startup = DirectionalBatteryRecovery(
-        saved_at, {"charge": DirectionalBatteryPairReference(saved_at, startup_wh)}
+        saved_at, 1, {"charge": DirectionalBatteryPairReference(saved_at, startup_wh)}
     )
     assert replay(0, grid=0, startup=startup).interval is None
     power = replay(300, grid=111050)
@@ -435,6 +435,7 @@ def test_implausible_startup_report_does_not_poison_recovery_reference(replay):
     saved_at = _START - timedelta(minutes=5)
     startup = DirectionalBatteryRecovery(
         saved_at,
+        1,
         {
             "charge": DirectionalBatteryPairReference(
                 saved_at, {"charge": 3050, "grid_battery": 1050, "solar_battery": 2000}
@@ -465,9 +466,10 @@ def test_lagging_direct_counter_cannot_age_a_rejected_directional_jump(replay):
     assert replay(1200, grid=1150, solar=250000).interval.watts["grid_battery"] == 600
 
 
-def test_leading_direct_counter_cannot_age_a_rejected_directional_jump(replay):
+@pytest.mark.parametrize("grid", [1049, 1050])
+def test_leading_direct_counter_cannot_age_a_rejected_directional_jump(replay, grid):
     replay(0, grid=1050, solar=250000)
-    assert replay(300, grid=1050, solar=250000, charge=261050).interval is None
+    assert replay(300, grid=grid, solar=250000, charge=261050).interval is None
     assert replay(600, grid=11050, solar=250000).interval is None
     assert replay(900, grid=1100, solar=250000).interval is None
     assert replay(1200, grid=1150, solar=250000).interval.watts["grid_battery"] == 600
@@ -547,6 +549,9 @@ def test_dropout_recovery_compares_paired_and_direct_deltas(replay):
         "known_hold",
         "hold_clock",
         "outlier_clock",
+        "invalid_report",
+        "invalid_before_reload",
+        "invalid_after_reload",
     ],
 )
 async def test_reload_during_dropout_uses_saved_same_day_counters(
@@ -578,7 +583,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
     manager = new_manager()
     closed_grid = 500
 
-    async def refresh(seconds, grid, *, solar=2000, receipt_seconds=None):
+    async def refresh(seconds, grid, *, solar=2000, charge=None, receipt_seconds=None):
         nonlocal now
         reported_at = _START + timedelta(seconds=seconds)
         now = (
@@ -593,7 +598,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
             "solar_battery": [0, solar],
             "battery_home": [0, 0],
             "battery_grid": [0, 0],
-            "charge": [closed_grid, grid + solar],
+            "charge": [closed_grid, grid + solar if charge is None else charge],
             "discharge": [0, 0],
         }
         await manager._async_refresh_site_energy(force=True)
@@ -633,6 +638,22 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
     elif history_kind == "outlier_clock":
         assert await refresh(600, 11050) is None
         assert (await refresh(900, 11100)).watts["grid_battery"] == 600
+
+    if history_kind in (
+        "invalid_report",
+        "invalid_before_reload",
+        "invalid_after_reload",
+    ):
+        if history_kind == "invalid_after_reload":
+            manager = new_manager()
+        assert await refresh(600, 1050, charge=13050) is None
+        assert await refresh(600, 1050) is None
+        if history_kind == "invalid_before_reload":
+            manager = new_manager()
+        assert await refresh(900, 11050) is None
+        assert await refresh(1200, 1100) is None
+        assert (await refresh(1500, 1150)).watts["grid_battery"] == 600
+        return
 
     manager = new_manager()
     if history_kind == "outlier_clock":
