@@ -29,7 +29,6 @@ from .coordinator import EnphaseCoordinator
 from .current_power_runtime import is_idle_power_sample
 from .device_info_helpers import _cloud_device_info
 from .energy import (
-    DirectionalBatteryHistory,
     LIFETIME_RESET_DROP_THRESHOLD_KWH,
     LIFETIME_RESET_FLOOR_KWH,
     LIFETIME_RESET_RATIO,
@@ -125,38 +124,6 @@ class _SiteEnergyRestoreData(SensorExtraStoredData):  # type: ignore[misc]
                 data.get("composition_migration_checked") is True
             ),
         )
-
-
-@dataclass
-class _DirectionalBatteryRestoreData(SensorExtraStoredData):  # type: ignore[misc]
-    """Persist the lifetime range together with the restored counter."""
-
-    history: DirectionalBatteryHistory
-
-    def as_dict(self) -> dict[str, object]:
-        return {
-            **super().as_dict(),
-            "directional_battery_start_date": self.history.start_date.isoformat(),
-            "directional_battery_bucket_count": self.history.bucket_count,
-            "directional_battery_complete_from": self.history.complete_from,
-        }
-
-    @staticmethod
-    def restored_history(data: dict[str, object]) -> DirectionalBatteryHistory | None:
-        start = data.get("directional_battery_start_date")
-        size = data.get("directional_battery_bucket_count")
-        complete_from = data.get("directional_battery_complete_from")
-        if (
-            not isinstance(start, str)
-            or type(size) is not int
-            or type(complete_from) is not int
-            or not 0 <= complete_from < size
-        ):
-            return None
-        start_date = dt_util.parse_date(start)
-        if start_date is None:
-            return None
-        return DirectionalBatteryHistory(start_date, size, complete_from)
 
 
 @dataclass
@@ -650,31 +617,6 @@ class EnphaseDirectionalBatteryEnergySensor(EnphaseSiteEnergySensor):
 
     def __init__(self, coord: EnphaseCoordinator, flow_key: str) -> None:
         super().__init__(coord, flow_key, flow_key, flow_key, type_key="encharge")
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        if self._restored_value is not None:
-            extra = await self.async_get_last_extra_data()
-            self._coord.energy.restore_directional_battery_baseline(
-                self._flow_key,
-                self._restored_value,
-                self._restored_reset_at,
-                _DirectionalBatteryRestoreData.restored_history(
-                    extra.as_dict() if extra is not None else {}
-                ),
-            )
-
-    @property
-    def extra_restore_state_data(self) -> ExtraStoredData | None:
-        sensor_restore = super().extra_restore_state_data
-        history = self._coord.energy.directional_battery_history
-        if history is None:
-            return sensor_restore
-        return _DirectionalBatteryRestoreData(
-            sensor_restore.native_value,
-            sensor_restore.native_unit_of_measurement,
-            history,
-        )
 
 
 class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]

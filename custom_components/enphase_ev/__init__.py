@@ -49,6 +49,7 @@ from .device_info_helpers import (
     _normalize_evse_model_name as _normalize_evse_model_name,
     async_prime_integration_version,
 )
+from .directional_battery_energy import directional_battery_store
 from .entity_cleanup import (
     entries_for_device,
     find_entity_id_by_unique_id,
@@ -840,8 +841,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> None:
-    """Clean up legacy Repairs only when the config entry is removed."""
+    """Clean up legacy Repairs and persisted site history on entry removal."""
     async_remove_entry_issues(hass, entry)
+    await directional_battery_store(hass, entry.entry_id).async_remove()
 
 
 async def _async_finish_unload(

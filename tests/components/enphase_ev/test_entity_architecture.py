@@ -131,33 +131,35 @@ async def test_site_energy_recorder_preserves_restored_total(
 
 
 @pytest.mark.parametrize(
-    ("lower", "expected_states", "expected_sum"),
+    ("original", "corrected", "recovered"),
     [
-        (5.0, ["5.5", "5.5", "5.5", "5.6"], 42.1),
-        (4.95, ["5.5", "5.5", "5.5", "5.6"], 42.1),
-        (4.9, ["5.5", "5.5", "4.9", "5.6"], 47.6),
+        ([5500], [5000], [5600]),
+        ([5500], [100], [5600]),
+        ([None, 5500], [3000, 5500], [None, 5600]),
+        ([3000, 2500], [3100, 2500], [3000, 2600]),
     ],
+    ids=["shallow-correction", "large-correction", "backfill", "closed-correction"],
 )
-def test_directional_battery_only_accepts_recorder_resets(
-    hass, coordinator_factory, monkeypatch, lower, expected_states, expected_sum
+def test_directional_battery_does_not_record_source_corrections(
+    hass, coordinator_factory, monkeypatch, original, corrected, recovered
 ):
     coord = coordinator_factory(serials=[])
     entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
     history = []
     start = datetime(2026, 10, 2, 10, 5, tzinfo=timezone.utc)
-    for index, value in enumerate((5.5, lower, lower, 5.6)):
-        bucket = round(value * 1000)
+    for index, values in enumerate((original, corrected, corrected, recovered)):
+        idle = [None if value is None else 0 for value in values]
         timestamp = start + timedelta(seconds=index)
         coord.energy.site_energy, _ = coord.energy._aggregate_site_energy(
             {
                 "start_date": "2026-10-02",
                 "last_report_date": timestamp.timestamp(),
-                "grid_battery": [bucket],
-                "solar_battery": [0],
-                "battery_home": [0],
-                "battery_grid": [0],
-                "charge": [bucket],
-                "discharge": [0],
+                "grid_battery": values,
+                "solar_battery": idle,
+                "battery_home": idle,
+                "battery_grid": idle,
+                "charge": values,
+                "discharge": idle,
             }
         )
         history.append(
@@ -173,10 +175,10 @@ def test_directional_battery_only_accepts_recorder_resets(
                 last_changed=timestamp,
             )
         )
-    assert [state.state for state in history] == expected_states
+    assert [state.state for state in history] == ["5.5", "5.5", "5.5", "5.6"]
     assert _compile_energy_sum(
         hass, monkeypatch, history, start, baseline=5.5
-    ) == pytest.approx(expected_sum)
+    ) == pytest.approx(42.1)
     assert "sensor.site_energy" not in hass.data.get(sensor_recorder.SEEN_DIP, set())
 
 

@@ -42,6 +42,9 @@ from custom_components.enphase_ev.const import (
     OPT_WEATHER_ENABLED,
 )
 from custom_components.enphase_ev.diagnostics import async_get_config_entry_diagnostics
+from custom_components.enphase_ev.directional_battery_energy import (
+    directional_battery_store,
+)
 from .random_ids import RANDOM_SERIAL
 
 
@@ -284,26 +287,38 @@ async def test_directional_battery_real_platform_lifecycle(
     assert await publish_grid(12003, advance=True) == 12.003
     assert await publish_grid(0, advance=True) == 12.003
     assert await publish_grid(1000, advance=True) == 12.003
-    assert await publish_grid(1000, advance=True) == 1.0
-    assert hass.states.get(grid_id).attributes["last_reset_at"]
+    assert await publish_grid(1000, advance=True) == 12.003
+    assert "last_reset_at" not in hass.states.get(grid_id).attributes
+    lifetime.update(grid_battery=[11_900], solar_battery=[403], charge=[12_303])
+    await coord.energy._async_refresh_site_energy(force=True)
+    coord.async_set_updated_data(dict(coord.data))
+    solar_id = ids["battery_energy_from_solar"]
+    assert float(hass.states.get(grid_id).state) == 12.003
+    assert float(hass.states.get(solar_id).state) == 0.3
+    lifetime["solar_battery"] = [300]
 
-    # A changed history can already be in the coordinator's cache when the
-    # sensors restore. Even a higher value from that range must stay out.
+    # Reject a shifted history before the first platform state write on reload.
     lifetime["start_date"] = "2026-09-06"
-    lifetime["grid_battery"] = [2400]
-    lifetime["charge"] = [2700]
+    lifetime["grid_battery"] = [24_000]
+    lifetime["charge"] = [24_300]
     assert await hass.config_entries.async_reload(config_entry.entry_id)
     await _finish_startup(hass, config_entry)
     coord = config_entry.runtime_data.coordinator
-    assert float(hass.states.get(grid_id).state) == 1.0
-    assert await publish_grid(2400, advance=True) == 1.0
-    assert await publish_grid(2401, advance=True) == 1.0
+    assert float(hass.states.get(grid_id).state) == 12.003
+    assert await publish_grid(24_000, advance=True) == 12.003
+    assert await publish_grid(24_001, advance=True) == 12.003
     lifetime["start_date"] = "2026-09-05"
-    assert await publish_grid(1500, advance=True) == 1.5
+    assert await publish_grid(12_004, advance=True) == 12.004
 
     assert all(registry.async_get(entity_id) is not None for entity_id in ids.values())
     assert not unexpected, ", ".join(unexpected)
     assert await hass.config_entries.async_unload(config_entry.entry_id)
+    assert await directional_battery_store(hass, config_entry.entry_id).async_load()
+    assert await hass.config_entries.async_remove(config_entry.entry_id)
+    assert (
+        await directional_battery_store(hass, config_entry.entry_id).async_load()
+        is None
+    )
 
 
 @pytest.mark.session_history_real

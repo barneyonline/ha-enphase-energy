@@ -96,6 +96,7 @@ from .const import (
     CONF_TOKEN_EXPIRES_AT,
     DEFAULT_API_TIMEOUT,
     DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
+    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     DEFAULT_FAST_POLL_INTERVAL,
     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
@@ -119,6 +120,7 @@ from .const import (
     HEMS_AUTH_MANUAL_CLEAR_COOLDOWN_S,
     OPT_API_TIMEOUT,
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
+    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     OPT_FAST_POLL_INTERVAL,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_NOMINAL_VOLTAGE,
@@ -135,6 +137,7 @@ from .const import (
 from .battery_runtime import BatteryRuntime
 from .coordinator_diagnostics import CoordinatorDiagnostics
 from .current_power_runtime import CurrentPowerRuntime, CurrentPowerSample
+from .directional_battery_energy import directional_battery_store
 from .discovery_snapshot import DiscoverySnapshotManager
 from .device_types import (
     normalize_type_key,
@@ -1055,6 +1058,20 @@ class EnphaseCoordinator(
             ),
             hems_auth_success=lambda endpoint: self._note_hems_auth_success(
                 endpoint=endpoint
+            ),
+            directional_battery_enabled=(
+                config_entry is None
+                or bool(
+                    config_entry.options.get(
+                        OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                        DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                    )
+                )
+            ),
+            directional_battery_store=(
+                directional_battery_store(hass, config_entry.entry_id)
+                if config_entry is not None
+                else None
             ),
         )
         self.evse_timeseries = EVSETimeseriesManager(

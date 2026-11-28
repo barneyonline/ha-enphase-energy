@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from homeassistant.const import UnitOfEnergy, UnitOfPower
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.enphase_ev import energy as energy_mod
 from custom_components.enphase_ev import sensor as sensor_mod
@@ -18,6 +19,9 @@ from custom_components.enphase_ev.api_parsers import (
     normalize_lifetime_energy_payload,
 )
 from custom_components.enphase_ev.const import DIRECTIONAL_BATTERY_ENERGY_FIELDS
+from custom_components.enphase_ev.directional_battery_energy import (
+    DirectionalBatteryEnergy,
+)
 from custom_components.enphase_ev.energy import (
     LifetimeGuardState,
     SiteEnergyFlow,
@@ -31,9 +35,6 @@ from custom_components.enphase_ev.sensor import (
     _SiteEnergyRestoreData,
     _SiteLifetimePowerRestoreData,
     _lifetime_energy_delta,
-)
-from custom_components.enphase_ev.sensor_site_energy import (
-    _DirectionalBatteryRestoreData,
 )
 
 from .device_info_helpers import device_info_fields
@@ -139,12 +140,12 @@ def test_directional_battery_ignores_leading_zero_as_support_for_inactive_pair(
     assert flows.keys() >= DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
 
 
-def test_directional_battery_accepts_direct_zero_dropout_and_empty_padding(
+def test_directional_battery_accepts_empty_aggregate_padding(
     coordinator_factory, directional_battery_payload
 ) -> None:
     payload = {
         **directional_battery_payload,
-        "charge": [None, 3510, 0, None],
+        "charge": [None, 3510, 522, None],
         "discharge": [None, 1301, 902, None],
     }
     flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
@@ -167,30 +168,6 @@ def test_directional_battery_boolean_does_not_become_measured_zero(
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"directional_battery_start_date": None},
-        {"directional_battery_start_date": "2023-02-30"},
-        {"directional_battery_bucket_count": True},
-        {"directional_battery_complete_from": False},
-        {"directional_battery_complete_from": 3},
-    ],
-)
-def test_directional_battery_ignores_invalid_restore_metadata(overrides) -> None:
-    assert (
-        _DirectionalBatteryRestoreData.restored_history(
-            {
-                "directional_battery_start_date": "2023-08-10",
-                "directional_battery_bucket_count": 3,
-                "directional_battery_complete_from": 1,
-                **overrides,
-            }
-        )
-        is None
-    )
-
-
-@pytest.mark.parametrize(
-    "overrides",
-    [
         {"solar_battery": None},
         {"battery_grid": []},
         {"solar_battery": [750, 320]},
@@ -198,6 +175,16 @@ def test_directional_battery_ignores_invalid_restore_metadata(overrides) -> None
         {"grid_battery": [None, 2750, -1]},
         {"grid_battery": [None, None, 202]},
         {"charge": [1000, 3510, 522]},
+        {"charge": []},
+        {"charge": [None, 3510, None]},
+        {"charge": [None, 3510, 0]},
+        {"charge": [None, 0, 0]},
+        {"discharge": [None, 1301, None]},
+        {
+            "charge": [None, 3510, None],
+            "grid_battery": [None, 2750, 0],
+            "solar_battery": [None, 750, 0],
+        },
         {"charge": [None, 3510, 522, 100]},
         {"discharge": [None, 1301, 902, 0]},
         {"grid_battery": [None, 2750, 40_000]},
@@ -268,6 +255,100 @@ def test_directional_battery_requires_previously_accepted_coverage(
     assert manager.site_energy["battery_energy_from_grid"].value_kwh == 2.952
 
 
+@pytest.mark.parametrize("corrected", [False, True])
+def test_directional_battery_reconciles_across_bucket_rollover(
+    coordinator_factory, directional_battery_payload, corrected
+) -> None:
+    manager = coordinator_factory().energy
+    payload = directional_battery_payload
+    keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    manager.site_energy, _ = manager._aggregate_site_energy(payload)
+    assert manager.site_energy.keys() >= keys
+    latest_grid, latest_solar = (102, 420) if corrected else (202, 320)
+    next_payload = {
+        **payload,
+        "last_report_date": 1_700_000_301,
+        "grid_battery": [None, 2750, latest_grid, 500],
+        "solar_battery": [None, 750, latest_solar, 50],
+        "charge": [None, 3510, 522, 550],
+        "battery_home": [None, 1300, 900, 0],
+        "battery_grid": [None, 0, 0, 100],
+        "discharge": [None, 1301, 902, 100],
+    }
+    flows, _ = manager._aggregate_site_energy(next_payload)
+    if corrected:
+        assert not flows.keys() & keys
+    else:
+        assert flows["battery_energy_from_grid"].value_kwh == 3.452
+        assert flows["battery_energy_to_grid"].value_kwh == 0.1
+
+
+@pytest.mark.parametrize(
+    "invalid_entry",
+    [
+        {"start": "2023-02-30"},
+        {"reported_at": "invalid"},
+        {"reported_at": "2023-11-14T22:13:21"},
+        {"reported_at": None},
+        {"size": True},
+        {"size": 0},
+        {"closed": []},
+        {"totals": []},
+        {"closed": {"grid_battery": True}},
+        {"closed": dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), 10_000)},
+        {"totals": dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), 0)},
+    ],
+)
+async def test_directional_battery_storage_refuses_invalid_history(
+    coordinator_factory, directional_battery_payload, invalid_entry
+) -> None:
+    manager = coordinator_factory().energy
+    store = AsyncMock()
+    store.async_load.return_value = None
+    battery = DirectionalBatteryEnergy(
+        manager._coerce_lifetime_bucket, store, enabled=True
+    )
+    start = datetime(2023, 8, 10, tzinfo=timezone.utc).date()
+    reported_at = datetime.fromtimestamp(1_700_000_001, timezone.utc)
+    await battery.async_load()
+    assert battery.totals(directional_battery_payload, start, reported_at, accept=True)
+    assert await battery.async_save()
+    valid = store.async_save.await_args.args[0]
+    store.async_load.return_value = {**valid, **invalid_entry}
+    restored = DirectionalBatteryEnergy(
+        manager._coerce_lifetime_bucket, store, enabled=True
+    )
+    await restored.async_load()
+    assert not restored.totals(
+        directional_battery_payload, start, reported_at, accept=True
+    )
+
+
+async def test_directional_battery_storage_does_not_publish_on_save_failure(
+    coordinator_factory, directional_battery_payload
+) -> None:
+    manager = coordinator_factory().energy
+    store = AsyncMock()
+    store.async_load.side_effect = [HomeAssistantError, None]
+    store.async_save.side_effect = [HomeAssistantError, None]
+    battery = DirectionalBatteryEnergy(
+        manager._coerce_lifetime_bucket, store, enabled=True
+    )
+    start = datetime(2023, 8, 10, tzinfo=timezone.utc).date()
+    reported_at = datetime.fromtimestamp(1_700_000_001, timezone.utc)
+    await battery.async_load()
+    assert not battery.totals(
+        directional_battery_payload, start, reported_at, accept=True
+    )
+    await battery.async_load()
+    assert battery.totals(directional_battery_payload, start, reported_at, accept=True)
+    assert not await battery.async_save()
+    assert battery.totals(directional_battery_payload, start, reported_at, accept=True)
+    assert await battery.async_save()
+    assert await battery.async_save()
+    assert store.async_save.await_count == 2
+
+
 def test_site_energy_aggregation_with_fallbacks(coordinator_factory) -> None:
     coord = coordinator_factory()
     payload = {
@@ -296,7 +377,6 @@ def test_site_energy_aggregation_with_fallbacks(coordinator_factory) -> None:
         "grid_export",
         "battery_charge",
         "battery_discharge",
-        *DIRECTIONAL_BATTERY_ENERGY_FIELDS,
     }
     assert flows["solar_production"].value_kwh == pytest.approx(3.0)
     assert flows["consumption"].value_kwh == pytest.approx(2.0)
