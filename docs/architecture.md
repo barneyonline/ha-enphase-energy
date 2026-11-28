@@ -747,9 +747,10 @@ Independently accepted
 restore history remains eligible until its original deadline. Calculation and
 freshness clocks remain separate. The four directional battery power estimates
 also use this option. Changing the option reloads the integration.
-Private restore data tags the mode so cached watts and baselines from the other
-mode cannot be reused. Same-mode
-restore retains the bounded averaging buffer without extending accepted expiry.
+Aggregate site power tags its private restore data with the averaging mode.
+When the mode matches, restore retains the bounded averaging buffer and its
+original expiry. Directional estimates build a fresh averaging window on
+reload.
 For aggregate site power, averaging validates its final watts independently of
 the consecutive interval calculation, including consumption-energy fallback.
 An extreme average requires a comparable, independently measured increment
