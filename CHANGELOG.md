@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug fixes
 
 - Honor Enphase session-history cooldowns for queued reads and preserve longer Retry-After deadlines.
+- Keep the last battery reserve reading and allow the ten-minute Repair to open when Enphase's profile response lacks a valid reserve. (#1025)
 
 ### 🔧 Improvements
 
