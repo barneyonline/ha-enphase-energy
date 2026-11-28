@@ -1449,9 +1449,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Viimeinen nollaus klo"
           }
         }
       },
@@ -1460,20 +1457,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Viimeinen nollaus klo"
-          }
-        }
-      },
-      "battery_energy_to_home": {
-        "name": "Energia akusta kotiin",
-        "state_attributes": {
-          "sampled_at_utc": {
-            "name": "Näyte otettu (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Viimeinen nollaus klo"
           }
         }
       },
@@ -1482,9 +1465,14 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Viimeinen nollaus klo"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Energia akusta kotiin",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Näyte otettu (UTC)"
           }
         }
       },

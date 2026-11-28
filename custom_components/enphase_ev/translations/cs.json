@@ -1449,9 +1449,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Čas vzorku (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Poslední reset"
           }
         }
       },
@@ -1460,20 +1457,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Čas vzorku (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Poslední reset"
-          }
-        }
-      },
-      "battery_energy_to_home": {
-        "name": "Energie z baterie do domu",
-        "state_attributes": {
-          "sampled_at_utc": {
-            "name": "Čas vzorku (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Poslední reset"
           }
         }
       },
@@ -1482,9 +1465,14 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Čas vzorku (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Poslední reset"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Energie z baterie do domu",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Čas vzorku (UTC)"
           }
         }
       },

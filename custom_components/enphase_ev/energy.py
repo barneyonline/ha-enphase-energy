@@ -94,6 +94,7 @@ class EnergyManager:
         directional_battery_enabled: bool = True,
         directional_battery_store: Store[dict[str, object]] | None = None,
         has_directional_battery_entities: Callable[[], bool] | None = None,
+        directional_site_timezone: Callable[[], str | None] | None = None,
     ) -> None:
         self._client_provider = client_provider
         self.site_id = site_id
@@ -123,6 +124,7 @@ class EnergyManager:
             directional_battery_store,
             enabled=directional_battery_enabled,
             has_previous_entities=has_directional_battery_entities,
+            site_timezone=directional_site_timezone,
         )
         self._site_energy_force_refresh = False
         self._site_energy_refresh_lock = asyncio.Lock()
@@ -1277,9 +1279,8 @@ class EnergyManager:
         # flows are usable. Only accepted flows advance the cache's freshness.
         self._site_energy_refresh_ts = time.monotonic()
         if parsed is None or not parsed[0]:
-            if accept and parsed is not None:
-                for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
-                    self.site_energy.pop(flow, None)
+            for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
+                self.site_energy.pop(flow, None)
             self._record_site_energy_fetch("invalid_payload")
             return
         self._record_site_energy_fetch("success")

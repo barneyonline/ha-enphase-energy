@@ -1079,6 +1079,7 @@ class EnphaseCoordinator(
             has_directional_battery_entities=lambda: has_directional_battery_entities(
                 hass, self.site_id
             ),
+            directional_site_timezone=lambda: self.battery_timezone,
         )
         self.evse_timeseries = EVSETimeseriesManager(
             hass,

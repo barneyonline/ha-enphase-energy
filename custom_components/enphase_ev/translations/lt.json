@@ -1449,9 +1449,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Matuota (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Paskutinis atstatymas"
           }
         }
       },
@@ -1460,20 +1457,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Matuota (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Paskutinis atstatymas"
-          }
-        }
-      },
-      "battery_energy_to_home": {
-        "name": "Energija iš baterijos į namus",
-        "state_attributes": {
-          "sampled_at_utc": {
-            "name": "Matuota (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Paskutinis atstatymas"
           }
         }
       },
@@ -1482,9 +1465,14 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Matuota (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Paskutinis atstatymas"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Energija iš baterijos į namus",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Matuota (UTC)"
           }
         }
       },

@@ -43,6 +43,7 @@ from .power_restore import (
     power_restore_data,
 )
 from .runtime_helpers import inventory_type_device_info as _type_device_info
+from .serial_entity_metadata import site_sensor_unique_id
 from .sensor_base import EnphaseSiteSensorEntity as _SiteBaseEntity
 from .sensor_common import (
     callback,
@@ -315,7 +316,7 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
         super().__init__(coord, flow_key, name, type_key=type_key)
         self._flow_key = flow_key
         self._attr_translation_key = translation_key
-        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_{flow_key}"
+        self._attr_unique_id = site_sensor_unique_id(coord.site_id, flow_key)
         self._restored_value: float | None = None
         self._restored_reset_at: str | None = None
         self._last_source_value: float | None = None

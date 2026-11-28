@@ -6,7 +6,7 @@ import logging
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, tzinfo
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -15,6 +15,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DIRECTIONAL_BATTERY_ENERGY_FIELDS, DOMAIN
+from .serial_entity_metadata import site_sensor_unique_id
 from .storage import AcknowledgedStore
 
 _FIELDS = tuple(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values())
@@ -39,7 +40,7 @@ def has_directional_battery_entities(hass: HomeAssistant, site_id: str) -> bool:
     registry = er.async_get(hass)
     return any(
         registry.async_get_entity_id(
-            "sensor", DOMAIN, f"{DOMAIN}_site_{site_id}_{flow}"
+            "sensor", DOMAIN, site_sensor_unique_id(site_id, flow)
         )
         is not None
         for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS
@@ -116,18 +117,31 @@ class DirectionalBatteryEnergy:
         *,
         enabled: bool,
         has_previous_entities: Callable[[], bool] | None = None,
+        site_timezone: Callable[[], str | None] | None = None,
     ) -> None:
         self._coerce_bucket = coerce_bucket
         self._store = store
         self._enabled = enabled
         self._has_previous_entities = has_previous_entities
+        self._site_timezone = site_timezone
+        self._zone_name: str | None = None
+        self._zone: tzinfo | None = None
         self._loaded = store is None
         self._history: _BatteryHistory | None = None
         self._saved_history: _BatteryHistory | None = None
 
     async def async_load(self) -> None:
         """Load the whole baseline before the first publication."""
-        if not self._enabled or self._loaded or self._store is None:
+        if not self._enabled:
+            return
+        if self._site_timezone is not None:
+            zone_name = self._site_timezone()
+            if zone_name != self._zone_name:
+                self._zone = (
+                    await dt_util.async_get_time_zone(zone_name) if zone_name else None
+                )
+                self._zone_name = zone_name
+        if self._loaded or self._store is None:
             return
         try:
             saved = await self._store.async_load()
@@ -204,6 +218,17 @@ class DirectionalBatteryEnergy:
                 return None
             size = len(values)
             series[field] = values
+        if self._zone is not None:
+            last_day = reported_at.astimezone(self._zone).date()
+            if size != (last_day - start).days + 1:
+                return None
+        else:
+            # The lifetime start is a site-local day, while the report cursor
+            # is in UTC. Only the observed daily layout is supported.
+            earliest = (reported_at - timedelta(hours=12)).date()
+            latest = (reported_at + timedelta(hours=14)).date()
+            if not (earliest - start).days + 1 <= size <= (latest - start).days + 1:
+                return None
         if previous is not None and size < previous.size:
             return None
 

@@ -1449,9 +1449,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Mesuré à (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Dernière réinitialisation"
           }
         }
       },
@@ -1460,20 +1457,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Mesuré à (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Dernière réinitialisation"
-          }
-        }
-      },
-      "battery_energy_to_home": {
-        "name": "Énergie de la batterie vers le logement",
-        "state_attributes": {
-          "sampled_at_utc": {
-            "name": "Mesuré à (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Dernière réinitialisation"
           }
         }
       },
@@ -1482,9 +1465,14 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Mesuré à (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Dernière réinitialisation"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Énergie de la batterie vers le logement",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
           }
         }
       },

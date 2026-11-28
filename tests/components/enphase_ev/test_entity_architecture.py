@@ -149,12 +149,13 @@ def test_directional_battery_does_not_record_source_corrections(
     entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
     history = []
     start = datetime(2026, 10, 2, 10, 5, tzinfo=timezone.utc)
+    source_start = start.date() - timedelta(days=len(original) - 1)
     for index, values in enumerate((original, corrected, corrected, recovered)):
         idle = [None if value is None else 0 for value in values]
         timestamp = start + timedelta(seconds=index)
         coord.energy.site_energy, _ = coord.energy._aggregate_site_energy(
             {
-                "start_date": "2026-10-02",
+                "start_date": source_start.isoformat(),
                 "last_report_date": timestamp.timestamp(),
                 "grid_battery": values,
                 "solar_battery": idle,

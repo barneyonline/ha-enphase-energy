@@ -1449,9 +1449,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Paraugs iegūts (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Pēdējā atiestatīšana"
           }
         }
       },
@@ -1460,20 +1457,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Paraugs iegūts (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Pēdējā atiestatīšana"
-          }
-        }
-      },
-      "battery_energy_to_home": {
-        "name": "Enerģija no akumulatora uz mājokli",
-        "state_attributes": {
-          "sampled_at_utc": {
-            "name": "Paraugs iegūts (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Pēdējā atiestatīšana"
           }
         }
       },
@@ -1482,9 +1465,14 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Paraugs iegūts (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Pēdējā atiestatīšana"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Enerģija no akumulatora uz mājokli",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Paraugs iegūts (UTC)"
           }
         }
       },

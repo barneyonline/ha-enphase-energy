@@ -173,7 +173,9 @@ async def test_directional_battery_real_platform_lifecycle(
     responses["devices_inventory"]["result"].append(
         {"type": "encharge", "devices": [{"serial_number": "BAT-TEST"}]}
     )
-    responses["battery_site_settings"] = {"data": {"hasEncharge": True}}
+    responses["battery_site_settings"] = {
+        "data": {"hasEncharge": True, "timezone": "Australia/Melbourne"}
+    }
     responses["battery_status"] = {
         "storages": [{"serial_number": "BAT-TEST", "current_charge": 70}]
     }

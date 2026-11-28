@@ -1449,9 +1449,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Próbka z godz. (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Ostatni reset"
           }
         }
       },
@@ -1460,20 +1457,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Próbka z godz. (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Ostatni reset"
-          }
-        }
-      },
-      "battery_energy_to_home": {
-        "name": "Energia z akumulatora do domu",
-        "state_attributes": {
-          "sampled_at_utc": {
-            "name": "Próbka z godz. (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Ostatni reset"
           }
         }
       },
@@ -1482,9 +1465,14 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Próbka z godz. (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Ostatni reset"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Energia z akumulatora do domu",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Próbka z godz. (UTC)"
           }
         }
       },

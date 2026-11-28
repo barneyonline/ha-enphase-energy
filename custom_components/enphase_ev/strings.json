@@ -1557,9 +1557,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Sampled At (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Last Reset At"
           }
         }
       },
@@ -1568,20 +1565,6 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Sampled At (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Last Reset At"
-          }
-        }
-      },
-      "battery_energy_to_home": {
-        "name": "Battery Energy To Home",
-        "state_attributes": {
-          "sampled_at_utc": {
-            "name": "Sampled At (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Last Reset At"
           }
         }
       },
@@ -1590,9 +1573,14 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Sampled At (UTC)"
-          },
-          "last_reset_at": {
-            "name": "Last Reset At"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Battery Energy To Home",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
           }
         }
       },
