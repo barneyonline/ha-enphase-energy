@@ -800,7 +800,7 @@
               "nominal_voltage": "Tipinė kintamosios srovės maitinimo įtampa galiai įvertinti, kai tiesioginės įtampos nėra. Numatytoji reikšmė: Pagal įkroviklio telemetriją, kai ji pasiekiama; kitu atveju pagal Home Assistant regioną, su atsargine 230 V reikšme.",
               "schedule_sync_enabled": "Tvarkykite „IQ EV Charger“ tvarkaraščius. Numatytoji reikšmė: Įjungta.",
               "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius. Numatytoji reikšmė: Įjungta.",
-              "directional_battery_energy_enabled": "Energijos skydelyje rodomas sukauptas energijos kiekis iš tinklo ir saulės modulių į bateriją bei iš baterijos į namus ir tinklą. Pagal numatytuosius nustatymus įjungta.",
+              "directional_battery_energy_enabled": "Energijos skydelyje rodomas sukauptas energijos kiekis iš tinklo ir saulės modulių į bateriją bei iš baterijos į namus ir tinklą. Kai galima patikrinti, taip pat rodomi pagal debesijos duomenis apskaičiuoti galios įverčiai. Pagal numatytuosius nustatymus įjungta.",
               "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius. Numatytoji reikšmė: Išjungta.",
               "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta. Numatytoji reikšmė: Išjungta."
             }
@@ -842,7 +842,7 @@
           "nominal_voltage": "Tipinė kintamosios srovės maitinimo įtampa galiai įvertinti, kai tiesioginės įtampos nėra. Numatytoji reikšmė: Pagal įkroviklio telemetriją, kai ji pasiekiama; kitu atveju pagal Home Assistant regioną, su atsargine 230 V reikšme.",
           "schedule_sync_enabled": "Tvarkykite „IQ EV Charger“ tvarkaraščius. Numatytoji reikšmė: Įjungta.",
           "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius. Numatytoji reikšmė: Įjungta.",
-          "directional_battery_energy_enabled": "Energijos skydelyje rodomas sukauptas energijos kiekis iš tinklo ir saulės modulių į bateriją bei iš baterijos į namus ir tinklą. Pagal numatytuosius nustatymus įjungta.",
+          "directional_battery_energy_enabled": "Energijos skydelyje rodomas sukauptas energijos kiekis iš tinklo ir saulės modulių į bateriją bei iš baterijos į namus ir tinklą. Kai galima patikrinti, taip pat rodomi pagal debesijos duomenis apskaičiuoti galios įverčiai. Pagal numatytuosius nustatymus įjungta.",
           "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius. Numatytoji reikšmė: Išjungta.",
           "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija. Reikalinga montuotojo prieiga. Numatytoji reikšmė: Išjungta.",
           "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta. Numatytoji reikšmė: Išjungta.",
@@ -1473,6 +1473,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Matuota (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Galia iš tinklo į bateriją",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Matuota (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Paskutinis langas (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Galia iš saulės modulių į bateriją",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Matuota (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Paskutinis langas (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Galia iš baterijos į namus",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Matuota (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Paskutinis langas (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Galia iš baterijos į tinklą",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Matuota (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Paskutinis langas (s)"
           }
         }
       },

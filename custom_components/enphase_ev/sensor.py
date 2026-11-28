@@ -80,6 +80,10 @@ from .scalar_helpers import (
 )
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .directional_battery_energy import has_directional_battery_entities
+from .directional_battery_power import (
+    DIRECTIONAL_BATTERY_POWER_FIELDS,
+    DirectionalBatteryPower,
+)
 from .sensor_snapshot_helpers import restore_power_w
 from .sensor_cloud_metadata import (
     EnphaseAccountAccessSensor,
@@ -221,6 +225,7 @@ from .sensor_site_energy import (
     EnphaseBatteryPowerSensor as EnphaseBatteryPowerSensor,
     EnphaseCurrentPowerConsumptionSensor as EnphaseCurrentPowerConsumptionSensor,
     EnphaseDirectionalBatteryEnergySensor,
+    EnphaseDirectionalBatteryPowerSensor,
     EnphaseGridPowerSensor as EnphaseGridPowerSensor,
     EnphaseSiteConsumptionPowerSensor as EnphaseSiteConsumptionPowerSensor,
     EnphaseSiteEnergySensor as EnphaseSiteEnergySensor,
@@ -336,6 +341,17 @@ async def async_setup_entry(
     known_directional_battery_energy = (
         directional_battery_energy_enabled
         and has_directional_battery_entities(hass, str(coord.site_id))
+    )
+    power = getattr(getattr(coord, "energy", None), "directional_battery_power", None)
+    directional_battery_power = (
+        power if isinstance(power, DirectionalBatteryPower) else None
+    )
+    known_directional_battery_power = directional_battery_power is not None and any(
+        ent_reg.async_get_entity_id(
+            "sensor", DOMAIN, registry_setup.site_sensor_unique_id(key)
+        )
+        is not None
+        for key in DIRECTIONAL_BATTERY_POWER_FIELDS
     )
     microinverter_lifetime_energy_enabled = bool(
         entry.options.get(
@@ -849,6 +865,16 @@ async def async_setup_entry(
                     _add_site_entity(
                         flow_key, EnphaseDirectionalBatteryEnergySensor(coord, flow_key)
                     )
+            if directional_battery_power is not None and (
+                known_directional_battery_power or directional_battery_power.qualified
+            ):
+                for key in DIRECTIONAL_BATTERY_POWER_FIELDS:
+                    _add_site_entity(
+                        key,
+                        EnphaseDirectionalBatteryPowerSensor(
+                            coord, key, directional_battery_power
+                        ),
+                    )
             if battery_power_supported:
                 _add_site_entity("battery_power", EnphaseBatteryPowerSensor(coord))
             else:
@@ -1185,6 +1211,8 @@ async def async_setup_entry(
             known_channels = tuple(values)
         vpp_runtime = getattr(coord, "vpp_runtime", None)
         return (
+            directional_battery_power is not None
+            and directional_battery_power.qualified,
             bool(getattr(coord, "_devices_inventory_ready", False)),
             _site_has_battery(coord),
             getattr(coord, "battery_has_enpower", None),

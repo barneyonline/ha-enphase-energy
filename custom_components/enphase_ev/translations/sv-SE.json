@@ -800,7 +800,7 @@
               "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig. Standard: Från laddarens telemetri när den är tillgänglig; annars baserat på Home Assistant-regionen, med ett reservvärde på 230 V.",
               "schedule_sync_enabled": "Hantera scheman för IQ EV Charger. Standard: Aktiverat.",
               "battery_schedules_enabled": "Hantera scheman för IQ Battery. Standard: Aktiverat.",
-              "directional_battery_energy_enabled": "Visar ackumulerad energi från elnätet och solcellerna till batteriet och från batteriet till hemmet och elnätet för energipanelen. Aktiverat som standard.",
+              "directional_battery_energy_enabled": "Visar ackumulerad energi från elnätet och solcellerna till batteriet och från batteriet till hemmet och elnätet för energipanelen. Visar även verifierade effektuppskattningar baserade på molndata. Aktiverat som standard.",
               "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare. Standard: Inaktiverat.",
               "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard. Standard: Inaktiverat."
             }
@@ -842,7 +842,7 @@
           "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig. Standard: Från laddarens telemetri när den är tillgänglig; annars baserat på Home Assistant-regionen, med ett reservvärde på 230 V.",
           "schedule_sync_enabled": "Hantera scheman för IQ EV Charger. Standard: Aktiverat.",
           "battery_schedules_enabled": "Hantera scheman för IQ Battery. Standard: Aktiverat.",
-          "directional_battery_energy_enabled": "Visar ackumulerad energi från elnätet och solcellerna till batteriet och från batteriet till hemmet och elnätet för energipanelen. Aktiverat som standard.",
+          "directional_battery_energy_enabled": "Visar ackumulerad energi från elnätet och solcellerna till batteriet och från batteriet till hemmet och elnätet för energipanelen. Visar även verifierade effektuppskattningar baserade på molndata. Aktiverat som standard.",
           "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare. Standard: Inaktiverat.",
           "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig. Kräver installatörsåtkomst. Standard: Inaktiverat.",
           "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard. Standard: Inaktiverat.",
@@ -1473,6 +1473,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Samplad kl. (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Effekt från elnätet till batteriet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Samplad kl. (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Senaste fönster (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Effekt från solcellerna till batteriet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Samplad kl. (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Senaste fönster (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Effekt från batteriet till hemmet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Samplad kl. (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Senaste fönster (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Effekt från batteriet till elnätet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Samplad kl. (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Senaste fönster (s)"
           }
         }
       },

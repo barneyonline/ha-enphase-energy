@@ -800,7 +800,7 @@
               "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist. Standard: Aus der Telemetrie des Ladegeräts, sofern verfügbar; andernfalls anhand der Home Assistant-Region, mit 230 V als Ersatzwert.",
               "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten. Standard: Aktiviert.",
               "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten. Standard: Aktiviert.",
-              "directional_battery_energy_enabled": "Zeigt für das Energie-Dashboard die kumulierte Energie vom Netz und von der Solaranlage zur Batterie sowie von der Batterie zum Haus und zum Netz an. Standard: aktiviert.",
+              "directional_battery_energy_enabled": "Zeigt für das Energie-Dashboard die kumulierte Energie vom Netz und von der Solaranlage zur Batterie sowie von der Batterie zum Haus und zum Netz an. Zeigt auch Schätzwerte für die Leistung aus Cloud-Daten an, sofern sie verifiziert sind. Standard: aktiviert.",
               "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter. Standard: Deaktiviert.",
               "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert. Standard: Deaktiviert."
             }
@@ -842,7 +842,7 @@
           "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist. Standard: Aus der Telemetrie des Ladegeräts, sofern verfügbar; andernfalls anhand der Home Assistant-Region, mit 230 V als Ersatzwert.",
           "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten. Standard: Aktiviert.",
           "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten. Standard: Aktiviert.",
-          "directional_battery_energy_enabled": "Zeigt für das Energie-Dashboard die kumulierte Energie vom Netz und von der Solaranlage zur Batterie sowie von der Batterie zum Haus und zum Netz an. Standard: aktiviert.",
+          "directional_battery_energy_enabled": "Zeigt für das Energie-Dashboard die kumulierte Energie vom Netz und von der Solaranlage zur Batterie sowie von der Batterie zum Haus und zum Netz an. Zeigt auch Schätzwerte für die Leistung aus Cloud-Daten an, sofern sie verifiziert sind. Standard: aktiviert.",
           "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter. Standard: Deaktiviert.",
           "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist. Erfordert Installateurzugriff. Standard: Deaktiviert.",
           "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert. Standard: Deaktiviert.",
@@ -1473,6 +1473,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Gemessen um (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Leistung vom Netz zur Batterie",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemessen um (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Letztes Fenster (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Leistung von der Solaranlage zur Batterie",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemessen um (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Letztes Fenster (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Leistung von der Batterie zum Haus",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemessen um (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Letztes Fenster (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Leistung von der Batterie zum Netz",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemessen um (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Letztes Fenster (s)"
           }
         }
       },

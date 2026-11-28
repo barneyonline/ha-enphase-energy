@@ -19,6 +19,10 @@ from .api import SiteEnergyUnavailable, guarded_read_scope
 from .cloud_retry import retry_after_delay, transient_backoff_delay
 from .const import CLOUD_TELEMETRY_STALE_AFTER_S, DIRECTIONAL_BATTERY_ENERGY_FIELDS
 from .directional_battery_energy import DirectionalBatteryEnergy
+from .directional_battery_power import (
+    DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED,
+    DirectionalBatteryPower,
+)
 from .log_redaction import redact_site_id, redact_text
 
 LIFETIME_DROP_JITTER_KWH = 0.02
@@ -139,6 +143,12 @@ class EnergyManager:
         )
         self._directional_battery_save_idle = asyncio.Event()
         self._directional_battery_save_idle.set()
+        self.directional_battery_power = (
+            DirectionalBatteryPower(SITE_ENERGY_DEFAULT_INTERVAL_MIN * 60.0)
+            if directional_battery_enabled
+            and DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED
+            else None
+        )
         self._site_energy_force_refresh = False
         self._site_energy_refresh_lock = asyncio.Lock()
         self._site_energy_completed_attempts = 0
@@ -675,6 +685,8 @@ class EnergyManager:
     def _clear_directional_battery_flows(self) -> None:
         for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
             self.site_energy.pop(flow, None)
+        if self.directional_battery_power is not None:
+            self.directional_battery_power.invalidate()
 
     def _aggregate_site_energy(
         self,
@@ -1308,6 +1320,7 @@ class EnergyManager:
         if self._site_energy_read_superseded(generation):
             return
         directional_totals: dict[str, tuple[float, int]] = {}
+        power = self.directional_battery_power
         if (
             accept
             and isinstance(payload, dict)
@@ -1328,6 +1341,17 @@ class EnergyManager:
                     self._directional_battery_save_idle.set()
             if self._site_energy_read_superseded(generation):
                 return
+            if power is not None and directional_totals:
+                assert directional_source is not None
+                power.observe(
+                    payload,
+                    directional_source,
+                    dt_util.utcnow(),
+                    directional_totals,
+                    self._coerce_lifetime_bucket,
+                )
+        if power is not None and not directional_totals:
+            power.invalidate()
         parsed = (
             None
             if malformed_source

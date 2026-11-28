@@ -2630,6 +2630,12 @@ def test_directional_battery_energy_strings_are_localized() -> None:
                 ]
             }
             yield sensor["name"]
+            power = sensors[f"battery_power_{direction}"]
+            assert power["state_attributes"] == {
+                key: sensors["site_battery_power"]["state_attributes"][key]
+                for key in ("sampled_at_utc", "last_window_seconds")
+            }
+            yield power["name"]
 
     source = tuple(translated_texts(root / "strings.json"))
     assert source[0] == "Enable Directional Battery Energy"

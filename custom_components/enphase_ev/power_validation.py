@@ -5,9 +5,28 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
+SITE_POWER_OUTLIER_MIN_W = 100_000
+SITE_POWER_OUTLIER_MIN_KWH = 5.0
+SITE_POWER_OUTLIER_FLOW_RATIO = 0.15
 EXTREME_SITE_POWER_W = 1_000_000.0
 EXTREME_CONFIRM_MIN_RATIO = 0.5
 EXTREME_CONFIRM_MAX_RATIO = 2.0
+
+
+def _energy_delta_to_power_w(
+    delta_kwh: float,
+    *,
+    window_s: float,
+    floor_zero: bool = False,
+    max_watts: float | None = None,
+) -> int:
+    """Convert an energy delta over a window into watts."""
+    watts = (delta_kwh * 3_600_000.0) / window_s
+    if floor_zero and watts < 0:
+        watts = 0
+    if max_watts is not None and watts > max_watts:
+        watts = max_watts
+    return int(round(watts))
 
 
 @dataclass(frozen=True, slots=True)

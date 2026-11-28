@@ -796,7 +796,7 @@
             "data_description": {
               "schedule_sync_enabled": "Enable controls to view and manage IQ EV Charger charging schedules. Default: Enabled.",
               "battery_schedules_enabled": "Enable controls to view and manage IQ Battery schedules. Default: Enabled.",
-              "directional_battery_energy_enabled": "Add lifetime Energy Dashboard sensors for grid-to-battery, solar-to-battery, battery-to-home, and battery-to-grid. Default: Enabled.",
+              "directional_battery_energy_enabled": "Add lifetime Energy Dashboard sensors for grid-to-battery, solar-to-battery, battery-to-home, and battery-to-grid. Includes cloud-derived power estimates where verified. Default: Enabled.",
               "system_event_repair_issues": "Create Home Assistant Repairs issues for active system alarms reported by Enphase. Default: Disabled.",
               "pricing_edits_enabled": "Enable controls to edit electricity rates used by the IQ Gateway. Default: Enabled.",
               "microinverter_lifetime_energy_enabled": "Enable individual lifetime energy sensors for each microinverter. Default: Disabled.",
@@ -838,7 +838,7 @@
         "data_description": {
           "schedule_sync_enabled": "Enable controls to view and manage IQ EV Charger charging schedules. Default: Enabled.",
           "battery_schedules_enabled": "Enable controls to view and manage IQ Battery schedules. Default: Enabled.",
-          "directional_battery_energy_enabled": "Add lifetime Energy Dashboard sensors for grid-to-battery, solar-to-battery, battery-to-home, and battery-to-grid. Default: Enabled.",
+          "directional_battery_energy_enabled": "Add lifetime Energy Dashboard sensors for grid-to-battery, solar-to-battery, battery-to-home, and battery-to-grid. Includes cloud-derived power estimates where verified. Default: Enabled.",
           "system_event_repair_issues": "Create Home Assistant Repairs issues for active system alarms reported by Enphase. Default: Disabled.",
           "pricing_edits_enabled": "Enable controls to edit electricity rates used by the IQ Gateway. Default: Enabled.",
           "microinverter_lifetime_energy_enabled": "Enable individual lifetime energy sensors for each microinverter. Default: Disabled.",
@@ -1581,6 +1581,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Sampled At (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Grid to Battery Power",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Last Window (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Solar to Battery Power",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Last Window (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Battery to Home Power",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Last Window (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Battery to Grid Power",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Last Window (s)"
           }
         }
       },

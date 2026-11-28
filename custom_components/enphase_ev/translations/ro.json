@@ -800,7 +800,7 @@
               "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă. Implicit: Din telemetria încărcătorului, când este disponibilă; altfel în funcție de regiunea Home Assistant, cu o valoare de rezervă de 230 V.",
               "schedule_sync_enabled": "Gestionați programele IQ EV Charger. Implicit: Activat.",
               "battery_schedules_enabled": "Gestionați programele IQ Battery. Implicit: Activat.",
-              "directional_battery_energy_enabled": "Afișează în panoul Energie totalurile cumulate de la rețea și panourile solare către baterie și de la baterie către locuință și rețea. Activat implicit.",
+              "directional_battery_energy_enabled": "Afișează în panoul Energie totalurile cumulate de la rețea și panourile solare către baterie și de la baterie către locuință și rețea. Include estimări ale puterii bazate pe date din cloud atunci când sunt verificate. Activat implicit.",
               "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor. Implicit: Dezactivat.",
               "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit. Implicit: Dezactivat."
             }
@@ -842,7 +842,7 @@
           "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă. Implicit: Din telemetria încărcătorului, când este disponibilă; altfel în funcție de regiunea Home Assistant, cu o valoare de rezervă de 230 V.",
           "schedule_sync_enabled": "Gestionați programele IQ EV Charger. Implicit: Activat.",
           "battery_schedules_enabled": "Gestionați programele IQ Battery. Implicit: Activat.",
-          "directional_battery_energy_enabled": "Afișează în panoul Energie totalurile cumulate de la rețea și panourile solare către baterie și de la baterie către locuință și rețea. Activat implicit.",
+          "directional_battery_energy_enabled": "Afișează în panoul Energie totalurile cumulate de la rețea și panourile solare către baterie și de la baterie către locuință și rețea. Include estimări ale puterii bazate pe date din cloud atunci când sunt verificate. Activat implicit.",
           "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor. Implicit: Dezactivat.",
           "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă. Necesită acces de instalator. Implicit: Dezactivat.",
           "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit. Implicit: Dezactivat.",
@@ -1473,6 +1473,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Eșantionat la (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Putere de la rețea către baterie",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Eșantionat la (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Ultima fereastră (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Putere de la panourile solare către baterie",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Eșantionat la (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Ultima fereastră (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Putere de la baterie către locuință",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Eșantionat la (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Ultima fereastră (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Putere de la baterie către rețea",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Eșantionat la (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Ultima fereastră (s)"
           }
         }
       },
