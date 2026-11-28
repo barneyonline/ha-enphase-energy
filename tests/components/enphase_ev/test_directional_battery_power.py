@@ -449,7 +449,8 @@ def test_implausible_startup_report_does_not_poison_recovery_reference(replay):
     assert replay(600, grid=1150).interval.watts["grid_battery"] == 600
 
 
-def test_legacy_report_at_saved_clock_can_seed_without_publishing(replay):
+@pytest.mark.parametrize("grid", [1050, 1100])
+def test_legacy_report_at_saved_clock_waits_for_advancing_source(replay, grid):
     startup = DirectionalBatteryRecovery(
         _START,
         1,
@@ -459,8 +460,9 @@ def test_legacy_report_at_saved_clock_can_seed_without_publishing(replay):
             )
         },
     )
-    assert replay(0, grid=1050, startup=startup).interval is None
-    assert replay(300, grid=1100).interval.watts["grid_battery"] == 600
+    assert replay(0, grid=grid, startup=startup).interval is None
+    assert replay(300, grid=1150).interval is None
+    assert replay(600, grid=1200).interval.watts["grid_battery"] == 600
 
 
 def test_rejected_outlier_in_other_pair_cannot_pin_the_dropout_guard(replay):
@@ -568,6 +570,8 @@ def test_dropout_recovery_compares_paired_and_direct_deltas(replay):
         "invalid_after_reload",
         "invalid_after_legacy_reload",
         "invalid_origin_after_reload",
+        "missing_start_across_reloads",
+        "legacy_at_saved_clock",
     ],
 )
 async def test_reload_during_dropout_uses_saved_same_day_counters(
@@ -606,7 +610,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         solar=2000,
         charge=None,
         receipt_seconds=None,
-        known_start=True,
+        source_start="known",
     ):
         nonlocal now
         reported_at = _START + timedelta(seconds=seconds)
@@ -616,9 +620,11 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
             else _START + timedelta(seconds=receipt_seconds)
         )
         read.return_value = {
-            "start_date": (
-                (_START.date() - timedelta(days=1)).isoformat() if known_start else None
-            ),
+            "start_date": {
+                "known": (_START.date() - timedelta(days=1)).isoformat(),
+                "other": (_START.date() - timedelta(days=2)).isoformat(),
+                "missing": None,
+            }[source_start],
             "last_report_date": reported_at.timestamp(),
             "grid_battery": [closed_grid, grid],
             "solar_battery": [0, solar],
@@ -639,7 +645,11 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         assert (await refresh(1200, 1300)).watts["grid_battery"] == 600
         assert "battery_energy_from_grid" not in manager.site_energy
         assert saved["totals"]["grid_battery"] == 1550
-    elif history_kind in ("legacy", "invalid_after_legacy_reload"):
+    elif history_kind in (
+        "legacy",
+        "invalid_after_legacy_reload",
+        "legacy_at_saved_clock",
+    ):
         del saved["power"]
     elif history_kind == "corrupt_checkpoint":
         del saved["power"]["pairs"]["charge"]["wh"]["grid_battery"]
@@ -671,6 +681,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         "invalid_after_reload",
         "invalid_after_legacy_reload",
         "invalid_origin_after_reload",
+        "missing_start_across_reloads",
     ):
         if history_kind not in ("invalid_report", "invalid_before_reload"):
             manager = new_manager()
@@ -679,11 +690,17 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
                 600,
                 1050,
                 charge=13050,
-                known_start=history_kind != "invalid_origin_after_reload",
+                source_start={
+                    "invalid_origin_after_reload": "other",
+                    "missing_start_across_reloads": "missing",
+                }.get(history_kind, "known"),
             )
             is None
         )
-        assert await refresh(600, 1050) is None
+        if history_kind == "missing_start_across_reloads":
+            manager = new_manager()
+        else:
+            assert await refresh(600, 1050) is None
         if history_kind == "invalid_after_legacy_reload":
             assert saved["power"]["closed_signature"] is None
         if history_kind in ("invalid_before_reload", "invalid_after_legacy_reload"):
@@ -694,6 +711,11 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         return
 
     manager = new_manager()
+    if history_kind == "legacy_at_saved_clock":
+        assert await refresh(300, 1075) is None
+        assert await refresh(600, 1100) is None
+        assert (await refresh(900, 1150)).watts["grid_battery"] == 600
+        return
     if history_kind == "outlier_clock":
         assert await refresh(1200, 11150) is None
         assert await refresh(1500, 1100) is None

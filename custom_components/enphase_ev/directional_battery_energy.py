@@ -443,7 +443,7 @@ class DirectionalBatteryEnergy:
             for_power
             and previous is None
             and self._saved_history is not None
-            and reported_at < self._saved_history.reported_at
+            and reported_at <= self._saved_history.reported_at
         ):
             return {}
         result = self._evaluate(
@@ -523,13 +523,15 @@ class DirectionalBatteryEnergy:
         """Reuse a known source checkpoint without trusting a rejected payload."""
         checkpoint = self._saved_power_checkpoint
         if checkpoint is not None:
-            if start == checkpoint.start and self._zone_name == checkpoint.timezone:
+            if (start is None or start == checkpoint.start) and (
+                self._zone_name == checkpoint.timezone
+            ):
                 return checkpoint.recovery
             return None
         saved = self._saved_history
         if (
             saved is not None
-            and start == saved.start.isoformat()
+            and (start is None or start == saved.start.isoformat())
             and self._zone_name == saved.timezone
         ):
             return _legacy_recovery(saved)

@@ -161,11 +161,7 @@ class DirectionalBatteryPower:
         startup: DirectionalBatteryRecovery | None,
     ) -> None:
         previous = self._last_report
-        if (
-            self._recovery_size is None
-            and startup is not None
-            and self._source_cursor is not None
-        ):
+        if self._recovery_size is None and startup is not None:
             self._restore_recovery(startup)
         if (
             self._source_cursor is not None
@@ -183,7 +179,7 @@ class DirectionalBatteryPower:
         if rollover:
             self._recovery_references.clear()
         self._recovery_size = report.bucket_count
-        self._track_recovery(report, totals, startup if previous is None else None)
+        self._track_recovery(report, totals)
         if any(reference.held for reference in self._recovery_references.values()):
             self._reset_window()
             return
@@ -283,12 +279,9 @@ class DirectionalBatteryPower:
         self,
         report: _Report,
         totals: dict[str, tuple[float, int]],
-        startup: DirectionalBatteryRecovery | None,
     ) -> None:
         for aggregate, fields in _AGGREGATE_PAIRS.items():
             reference = self._recovery_references.get(aggregate)
-            if reference is None and startup is not None:
-                reference = startup.pairs.get(aggregate)
             if reference is None:
                 reference = _pair_reference(report, aggregate, fields)
             else:
@@ -336,8 +329,6 @@ def _advance_pair_reference(
         and (aggregate not in deltas or deltas[aggregate] < 0)
     )
     elapsed = (report.reported_at - reference.reported_at).total_seconds()
-    if elapsed <= 0:
-        return replace(reference, held=held)
     allowed_elapsed = _allowed_elapsed(
         elapsed, reference.max_elapsed_seconds, minimum_window_seconds
     )
