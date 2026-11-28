@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 import math
 
@@ -27,6 +28,31 @@ def _energy_delta_to_power_w(
     if max_watts is not None and watts > max_watts:
         watts = max_watts
     return int(round(watts))
+
+
+def site_power_sample_is_plausible(
+    power_w: int, signed_delta_kwh: float, flow_values_kwh: Iterable[float]
+) -> bool:
+    """Reject corrupt cumulative deltas while allowing large sites."""
+    abs_delta_kwh = abs(signed_delta_kwh)
+    if (
+        abs(power_w) < SITE_POWER_OUTLIER_MIN_W
+        or abs_delta_kwh < SITE_POWER_OUTLIER_MIN_KWH
+    ):
+        return True
+
+    flow_scale_kwh = 0.0
+    for value in flow_values_kwh:
+        try:
+            numeric = abs(float(value))
+        except Exception:
+            continue
+        flow_scale_kwh = max(flow_scale_kwh, numeric)
+
+    return (
+        flow_scale_kwh <= 0
+        or abs_delta_kwh < flow_scale_kwh * SITE_POWER_OUTLIER_FLOW_RATIO
+    )
 
 
 @dataclass(frozen=True, slots=True)

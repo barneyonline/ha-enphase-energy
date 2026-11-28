@@ -210,6 +210,67 @@ def _configure_directional_battery_site(hass, config_entry, responses):
 
 
 @pytest.mark.session_history_real
+async def test_directional_battery_power_publishes_same_cursor_invalidation(
+    hass, config_entry, platform_cloud, freezer, monkeypatch
+):
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.energy.DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED",
+        True,
+    )
+    responses, calls, _unexpected = platform_cloud
+    _configure_directional_battery_site(hass, config_entry, responses)
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data={
+            **config_entry.data,
+            CONF_SERIALS: [RANDOM_SERIAL],
+            CONF_SITE_ONLY: False,
+            CONF_SELECTED_TYPE_KEYS: ["envoy", "encharge", "iqevse"],
+        },
+    )
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    coord = config_entry.runtime_data.coordinator
+    assert coord.always_update is False
+
+    lifetime = responses["lifetime_energy"]
+    freezer.tick(timedelta(minutes=5))
+    lifetime.update(
+        last_report_date=dt_util.utcnow().timestamp(),
+        grid_battery=[12050],
+        charge=[12350],
+    )
+    await coord.async_refresh()
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    ids = {
+        key: registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{DOMAIN}_site_{coord.site_id}_{key}"
+        )
+        for key in DIRECTIONAL_BATTERY_POWER_FIELDS
+    }
+    assert float(hass.states.get(ids["battery_power_from_grid"]).state) == 600
+
+    await coord.async_refresh()
+    await hass.async_block_till_done()
+    # Force the lifetime read at the same clock. The revised direct charge
+    # rounds to the same aggregate kWh.
+    previous_flows = dict(coord.energy.site_energy)
+    previous_reads = calls["lifetime_energy"].await_count
+    coord.energy._site_energy_force_refresh = True
+    lifetime["charge"] = [12350.1]
+    await coord.async_refresh()
+    await hass.async_block_till_done()
+    assert calls["lifetime_energy"].await_count == previous_reads + 1
+    assert coord.energy.site_energy == previous_flows
+    assert coord.energy.directional_battery_power.interval is None
+    assert all(
+        hass.states.get(entity_id).state == STATE_UNAVAILABLE
+        for entity_id in ids.values()
+    )
+
+
+@pytest.mark.session_history_real
 @pytest.mark.parametrize("source_validated", [False, True])
 async def test_directional_battery_power_platform_lifecycle(
     hass,

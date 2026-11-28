@@ -69,6 +69,7 @@ class _BatteryHistory:
     size: int
     closed: dict[str, float]
     totals: dict[str, float]
+    closed_buckets: tuple[tuple[float | None, ...], ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -290,6 +291,7 @@ class DirectionalBatteryEnergy:
 
         totals = dict.fromkeys(_FIELDS, 0.0)
         closed = totals.copy()
+        closed_buckets: list[tuple[float | None, ...]] = []
         direct_totals = dict.fromkeys(_AGGREGATE_PAIRS, 0.0)
         reporting_started = False
         count = 0
@@ -307,6 +309,15 @@ class DirectionalBatteryEnergy:
                 for field, values in series.items()
                 if (sample := self._coerce_bucket(values[index])) is not None
             }
+            if for_power and index < size - 1:
+                bucket = tuple(reported.get(field) for field in _FIELDS)
+                if (
+                    previous is not None
+                    and index < len(previous.closed_buckets)
+                    and bucket != previous.closed_buckets[index]
+                ):
+                    return None
+                closed_buckets.append(bucket)
             direct = {
                 key: total
                 for key, values in aggregates.items()
@@ -337,18 +348,14 @@ class DirectionalBatteryEnergy:
             if (
                 previous is not None
                 and index == previous.size - 1
+                and not for_power
                 and any(
                     total < previous.totals[field] for field, total in totals.items()
                 )
-                and not (
-                    for_power
-                    and size == previous.size
-                    and reported_at > previous.reported_at
-                )
             ):
-                # A correction in any previously counted direction invalidates
-                # cumulative energy. Power can seed from a revised open bucket
-                # on an advancing clock, without trusting the revised delta.
+                # Recorder cannot accept any decrease in already counted
+                # energy. Power handles a formerly open bucket by reseeding
+                # when a counter decreases or the site enters a new day.
                 return None
             count += 1
         if not any(totals.values()) or not all(
@@ -372,6 +379,14 @@ class DirectionalBatteryEnergy:
         ):
             return None
         return (
-            _BatteryHistory(start, zone_name, reported_at, size, closed, totals),
+            _BatteryHistory(
+                start,
+                zone_name,
+                reported_at,
+                size,
+                closed,
+                totals,
+                tuple(closed_buckets),
+            ),
             count,
         )

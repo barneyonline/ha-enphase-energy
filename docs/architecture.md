@@ -683,7 +683,11 @@ The next estimate uses only a complete, reconciled window after the revision.
 The power baseline is independent of the saved cumulative energy baseline.
 Missing, stale, or inconsistent data break the group's calculation history.
 Corrections to closed directional history fail source validation. Same-clock
-revisions break the window. Site-local day rollover requires a fresh baseline.
+revisions break the window. An entire previously active charge or discharge
+pair dropping to zero holds the group unavailable until the pair returns and a
+fresh window is available. Site-local day rollover seeds a new power baseline
+even if the closing bucket was revised. The group's qualification and both
+power readings participate in coordinator snapshot equality.
 Each entity uses the group's source timestamp for freshness. Reloads seed from
 fresh upstream data and never restore a watts estimate. Entity registration
 is gated pending [short-window source validation](api/directional_battery_power.md).

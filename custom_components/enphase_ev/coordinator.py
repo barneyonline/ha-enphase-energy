@@ -1272,6 +1272,7 @@ class EnphaseCoordinator(
                 serial: {**payload, "charge_mode_solar_modes": solar_choices(serial)}
                 for serial, payload in data.items()
             }
+        directional_power = self.energy.directional_battery_power
         candidate = IntegrationSnapshot(
             chargers=freeze_charger_data(charger_data),
             evse_feature_flags=feature_flags,
@@ -1292,6 +1293,15 @@ class EnphaseCoordinator(
                     "flows": self.energy.site_energy,
                     "metadata": self.energy.site_energy_meta,
                     "available": self.energy.service_available,
+                    "directional_power": (
+                        (
+                            directional_power.qualified,
+                            directional_power.interval,
+                            directional_power.average,
+                        )
+                        if directional_power is not None
+                        else None
+                    ),
                 },
                 tariff={
                     name: getattr(self, name, None)

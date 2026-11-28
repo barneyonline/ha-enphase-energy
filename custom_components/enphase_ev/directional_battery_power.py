@@ -11,11 +11,9 @@ from .const import CLOUD_TELEMETRY_STALE_AFTER_S
 from .directional_battery_energy import _AGGREGATE_PAIRS, _FIELDS, _pairs_reconcile
 from .power_average import EnergyPowerAverage
 from .power_validation import (
-    SITE_POWER_OUTLIER_FLOW_RATIO,
-    SITE_POWER_OUTLIER_MIN_KWH,
-    SITE_POWER_OUTLIER_MIN_W,
     ExtremePowerValidator,
     _energy_delta_to_power_w,
+    site_power_sample_is_plausible,
 )
 
 # The lifetime recordings available for #1029 establish daily coverage.
@@ -55,6 +53,7 @@ class DirectionalBatteryPower:
         self._minimum_window_seconds = minimum_window_seconds
         self._baseline: _Report | None = None
         self._last_report: _Report | None = None
+        self._dropout_pairs: set[str] = set()
         self._validators = {field: ExtremePowerValidator() for field in _FIELDS}
         self._averages = {field: EnergyPowerAverage() for field in _FIELDS}
         self.qualified = False
@@ -112,6 +111,20 @@ class DirectionalBatteryPower:
                 self.invalidate()
             return
         self._last_report = report
+        if previous is None or report.bucket_count != previous.bucket_count:
+            self._dropout_pairs.clear()
+        else:
+            for aggregate in _AGGREGATE_PAIRS:
+                if report.wh[aggregate] > 0:
+                    self._dropout_pairs.discard(aggregate)
+                elif previous.wh[aggregate] > 0:
+                    self._dropout_pairs.add(aggregate)
+        if self._dropout_pairs:
+            # A whole previously active pair disappearing can be a cloud
+            # dropout. Keep the window empty so restoration cannot look like
+            # new energy, even after several consecutive zero reports.
+            self.invalidate()
+            return
         baseline = self._baseline
         if (
             baseline is None
@@ -162,9 +175,9 @@ class DirectionalBatteryPower:
             not result.accepted
             or (
                 not result.confirmed_extreme
-                and watts[field] >= SITE_POWER_OUTLIER_MIN_W
-                and deltas[field] >= SITE_POWER_OUTLIER_MIN_KWH * 1000
-                and deltas[field] >= totals[field][0] * SITE_POWER_OUTLIER_FLOW_RATIO
+                and not site_power_sample_is_plausible(
+                    watts[field], deltas[field] / 1000.0, (totals[field][0] / 1000.0,)
+                )
             )
             for field, result in validation.items()
         ):

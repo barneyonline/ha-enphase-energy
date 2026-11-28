@@ -236,6 +236,21 @@ def test_advancing_direct_counter_revision_seeds_new_window(replay):
     assert power.average == power.interval
 
 
+def test_complete_pair_dropout_stays_unavailable_until_fresh_window(replay):
+    replay(0, solar=0)
+    assert replay(300, grid=1050, solar=0).interval.watts["grid_battery"] == 600
+
+    for seconds in (600, 900):
+        power = replay(seconds, grid=0, solar=0)
+        assert power.interval is power.average is None
+
+    power = replay(1200, grid=1050, solar=0)
+    assert power.interval is power.average is None
+    power = replay(1500, grid=1100, solar=0)
+    assert power.interval.watts["grid_battery"] == 600
+    assert power.average == power.interval
+
+
 @pytest.mark.parametrize("bad_time", [150, 300])
 def test_regressed_report_or_same_timestamp_correction(replay, bad_time):
     replay(0)
