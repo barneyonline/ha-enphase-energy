@@ -1352,6 +1352,7 @@ class EnergyManager:
                         dt_util.utcnow(),
                         power_totals,
                         self._coerce_lifetime_bucket,
+                        source=self._directional_battery.power_source,
                         startup=self._directional_battery.power_startup_reference(),
                     )
                 elif self._directional_battery.source_context_ready:

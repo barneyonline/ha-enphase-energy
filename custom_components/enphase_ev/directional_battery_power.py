@@ -14,6 +14,7 @@ from .directional_battery_energy import (
     _pairs_reconcile,
     DirectionalBatteryPairReference,
     DirectionalBatteryRecovery,
+    DirectionalBatterySource,
 )
 from .power_average import EnergyPowerAverage
 from .power_validation import (
@@ -48,6 +49,7 @@ class DirectionalBatteryPowerReading:
 class _Report:
     """The current partial day's raw Wh counters and report clock."""
 
+    source: DirectionalBatterySource
     reported_at: datetime
     bucket_count: int
     wh: dict[str, float]
@@ -61,7 +63,7 @@ class DirectionalBatteryPower:
         self._baseline: _Report | None = None
         self._last_report: _Report | None = None
         self._source_cursor: datetime | None = None
-        self._recovery_size: int | None = None
+        self._recovery_scope: tuple[DirectionalBatterySource, int] | None = None
         self._recovery_references: dict[str, DirectionalBatteryPairReference] = {}
         self._validators = {field: ExtremePowerValidator() for field in _FIELDS}
         self._averages = {field: EnergyPowerAverage() for field in _FIELDS}
@@ -87,7 +89,7 @@ class DirectionalBatteryPower:
     ) -> None:
         """Retain the first unavailable interval without trusting its counters."""
         self._reset_window()
-        if self._recovery_size is None and startup is not None:
+        if self._recovery_scope is None and startup is not None:
             self._restore_recovery(startup)
         if self._source_cursor is not None and reported_at <= self._source_cursor:
             return
@@ -96,7 +98,7 @@ class DirectionalBatteryPower:
 
     def _restore_recovery(self, startup: DirectionalBatteryRecovery) -> None:
         self._recovery_references = startup.pairs.copy()
-        self._recovery_size = startup.bucket_count
+        self._recovery_scope = startup.source, startup.bucket_count
         if self._source_cursor is None or self._source_cursor <= startup.reported_at:
             self._source_cursor = startup.reported_at
         else:
@@ -127,6 +129,7 @@ class DirectionalBatteryPower:
         totals: dict[str, tuple[float, int]],
         coerce_bucket: Callable[[object], float | None],
         *,
+        source: DirectionalBatterySource,
         startup: DirectionalBatteryRecovery | None = None,
     ) -> None:
         """Use a daily payload accepted for power by the lifetime source validator."""
@@ -147,7 +150,7 @@ class DirectionalBatteryPower:
                 return
             wh[field] = value
         self._observe(
-            _Report(reported_at, bucket_count, wh),
+            _Report(source, reported_at, bucket_count, wh),
             received_at,
             totals,
             startup,
@@ -161,7 +164,7 @@ class DirectionalBatteryPower:
         startup: DirectionalBatteryRecovery | None,
     ) -> None:
         previous = self._last_report
-        if self._recovery_size is None and startup is not None:
+        if self._recovery_scope is None and startup is not None:
             self._restore_recovery(startup)
         if (
             self._source_cursor is not None
@@ -172,13 +175,11 @@ class DirectionalBatteryPower:
             return
         self._source_cursor = report.reported_at
         self._last_report = report
-        rollover = (
-            self._recovery_size is not None
-            and report.bucket_count != self._recovery_size
-        )
-        if rollover:
+        scope = report.source, report.bucket_count
+        if self._recovery_scope is not None and scope != self._recovery_scope:
             self._recovery_references.clear()
-        self._recovery_size = report.bucket_count
+            self._reset_window()
+        self._recovery_scope = scope
         self._track_recovery(report, totals)
         if any(reference.held for reference in self._recovery_references.values()):
             self._reset_window()
@@ -186,7 +187,6 @@ class DirectionalBatteryPower:
         baseline = self._baseline
         if (
             baseline is None
-            or report.bucket_count != baseline.bucket_count
             or (report.reported_at - baseline.reported_at).total_seconds()
             >= CLOUD_TELEMETRY_STALE_AFTER_S
             or (received_at - baseline.reported_at).total_seconds()
@@ -299,10 +299,11 @@ class DirectionalBatteryPower:
         self, reported_at: datetime
     ) -> DirectionalBatteryRecovery | None:
         """Checkpoint the raw source cursor and recovery state without watts."""
-        if self._recovery_size is None or reported_at != self._source_cursor:
+        if self._recovery_scope is None or reported_at != self._source_cursor:
             return None
+        source, bucket_count = self._recovery_scope
         return DirectionalBatteryRecovery(
-            reported_at, self._recovery_size, self._recovery_references.copy()
+            source, reported_at, bucket_count, self._recovery_references.copy()
         )
 
 

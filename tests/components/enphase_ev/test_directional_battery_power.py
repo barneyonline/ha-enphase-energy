@@ -22,6 +22,7 @@ from custom_components.enphase_ev.sensor_site_energy import (
 )
 
 _START = datetime(2026, 9, 5, 12, tzinfo=UTC)
+_SOURCE = (_START.date(), "UTC")
 _FIELDS = tuple(DIRECTIONAL_BATTERY_POWER_FIELDS.values())
 
 
@@ -69,6 +70,7 @@ def replay():
                 for field, value in zip(_FIELDS, values, strict=True)
             },
             manager._coerce_lifetime_bucket,
+            source=_SOURCE,
             startup=startup,
         )
         power.publish()
@@ -418,7 +420,10 @@ def test_implausible_recovery_preserves_restart_watermark(replay):
     }
     saved_at = _START - timedelta(minutes=5)
     startup = DirectionalBatteryRecovery(
-        saved_at, 1, {"charge": DirectionalBatteryPairReference(saved_at, startup_wh)}
+        _SOURCE,
+        saved_at,
+        1,
+        {"charge": DirectionalBatteryPairReference(saved_at, startup_wh)},
     )
     assert replay(0, grid=0, startup=startup).interval is None
     power = replay(300, grid=111050)
@@ -434,6 +439,7 @@ def test_implausible_recovery_preserves_restart_watermark(replay):
 def test_implausible_startup_report_does_not_poison_recovery_reference(replay):
     saved_at = _START - timedelta(minutes=5)
     startup = DirectionalBatteryRecovery(
+        _SOURCE,
         saved_at,
         1,
         {
@@ -452,6 +458,7 @@ def test_implausible_startup_report_does_not_poison_recovery_reference(replay):
 @pytest.mark.parametrize("grid", [1050, 1100])
 def test_legacy_report_at_saved_clock_waits_for_advancing_source(replay, grid):
     startup = DirectionalBatteryRecovery(
+        _SOURCE,
         _START,
         1,
         {
@@ -571,7 +578,11 @@ def test_dropout_recovery_compares_paired_and_direct_deltas(replay):
         "invalid_after_legacy_reload",
         "invalid_origin_after_reload",
         "missing_start_across_reloads",
+        "blank_start_across_reloads",
+        "unpadded_start_across_reloads",
         "legacy_at_saved_clock",
+        "origin_shift",
+        "regressed_origin",
     ],
 )
 async def test_reload_during_dropout_uses_saved_same_day_counters(
@@ -619,11 +630,15 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
             if receipt_seconds is None
             else _START + timedelta(seconds=receipt_seconds)
         )
-        read.return_value = {
+        start_day = _START.date() - timedelta(days=1)
+        payload = {
             "start_date": {
-                "known": (_START.date() - timedelta(days=1)).isoformat(),
+                "known": start_day.isoformat(),
                 "other": (_START.date() - timedelta(days=2)).isoformat(),
+                "shifted": _START.date().isoformat(),
                 "missing": None,
+                "blank": "",
+                "unpadded": f"{start_day.year}-{start_day.month}-{start_day.day}",
             }[source_start],
             "last_report_date": reported_at.timestamp(),
             "grid_battery": [closed_grid, grid],
@@ -633,12 +648,18 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
             "charge": [closed_grid, grid + solar if charge is None else charge],
             "discharge": [0, 0],
         }
+        if source_start == "shifted" and reported_at.date() == _START.date():
+            payload = {
+                key: value[-1:] if isinstance(value, list) else value
+                for key, value in payload.items()
+            }
+        read.return_value = payload
         await manager._async_refresh_site_energy(force=True)
         return manager.directional_battery_power.interval
 
     assert await refresh(0, 1000) is None
     assert (await refresh(300, 1050)).watts["grid_battery"] == 600
-    if history_kind == "closed_revision":
+    if history_kind in ("closed_revision", "regressed_origin"):
         closed_grid = 450
         assert await refresh(600, 1100) is None
         assert await refresh(900, 1250) is None
@@ -667,7 +688,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         saved["power"]["reported_at"] = "9999-12-31T08:00:00+00:00"
     elif history_kind == "naive_clock":
         saved["power"]["reported_at"] = "2026-09-05T12:05:00"
-    elif history_kind in ("known_hold", "hold_clock"):
+    elif history_kind in ("known_hold", "hold_clock", "origin_shift"):
         assert await refresh(600, 0) is None
         assert await refresh(900, 0) is None
         assert await refresh(1200, 0) is None
@@ -682,6 +703,8 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         "invalid_after_legacy_reload",
         "invalid_origin_after_reload",
         "missing_start_across_reloads",
+        "blank_start_across_reloads",
+        "unpadded_start_across_reloads",
     ):
         if history_kind not in ("invalid_report", "invalid_before_reload"):
             manager = new_manager()
@@ -693,11 +716,17 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
                 source_start={
                     "invalid_origin_after_reload": "other",
                     "missing_start_across_reloads": "missing",
+                    "blank_start_across_reloads": "blank",
+                    "unpadded_start_across_reloads": "unpadded",
                 }.get(history_kind, "known"),
             )
             is None
         )
-        if history_kind == "missing_start_across_reloads":
+        if history_kind in (
+            "missing_start_across_reloads",
+            "blank_start_across_reloads",
+            "unpadded_start_across_reloads",
+        ):
             manager = new_manager()
         else:
             assert await refresh(600, 1050) is None
@@ -711,6 +740,27 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         return
 
     manager = new_manager()
+    if history_kind == "origin_shift":
+        assert await refresh(86400, 10, source_start="missing") is None
+        assert await refresh(86700, 10, source_start="shifted") is None
+        assert saved["power"]["start"] == _START.date().isoformat()
+        assert (await refresh(87000, 60, source_start="shifted")).watts[
+            "grid_battery"
+        ] == 600
+        return
+    if history_kind == "regressed_origin":
+        assert (
+            await refresh(900, 10, receipt_seconds=1201, source_start="shifted") is None
+        )
+        assert (
+            await refresh(1100, 60, receipt_seconds=1202, source_start="shifted")
+            is None
+        )
+        assert await refresh(1500, 100, source_start="shifted") is None
+        assert (await refresh(1800, 150, source_start="shifted")).watts[
+            "grid_battery"
+        ] == 600
+        return
     if history_kind == "legacy_at_saved_clock":
         assert await refresh(300, 1075) is None
         assert await refresh(600, 1100) is None
