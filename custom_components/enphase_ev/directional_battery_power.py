@@ -197,13 +197,14 @@ class DirectionalBatteryPower:
 
         for aggregate, fields in _AGGREGATE_PAIRS.items():
             trusted = self._recovery_references[aggregate]
-            if any(validation[field].confirmed_extreme for field in fields) or any(
+            confirmed = {
+                field for field in fields if validation[field].confirmed_extreme
+            }
+            if confirmed or any(
                 report.wh[field] < value for field, value in trusted.wh.items()
             ):
-                # The window confirms the counter scale after an extreme or
-                # the new allocation after a same-day revision.
-                self._recovery_references[aggregate] = _pair_reference(
-                    report, aggregate, fields
+                self._recovery_references[aggregate] = _confirm_pair_revision(
+                    trusted, report, totals, aggregate, fields, confirmed
                 )
         self._next_interval = DirectionalBatteryPowerReading(
             report.reported_at, seconds, watts
@@ -279,33 +280,46 @@ def _advance_pair_reference(
     fields: tuple[str, str],
 ) -> DirectionalBatteryPairReference:
     deltas = {field: report.wh[field] - value for field, value in reference.wh.items()}
-    if reference.held:
-        if any(delta < 0 for delta in deltas.values()):
-            return reference
-    elif any(deltas[field] < 0 for field in fields) and (
-        aggregate not in deltas or deltas[aggregate] < 0
-    ):
-        return replace(reference, held=True)
-
+    held = reference.held or (
+        any(deltas[field] < 0 for field in fields)
+        and (aggregate not in deltas or deltas[aggregate] < 0)
+    )
     elapsed = (report.reported_at - reference.reported_at).total_seconds()
     if elapsed <= 0:
-        return reference
+        return replace(reference, held=held)
     allowed_elapsed = (
         elapsed
         if reference.max_elapsed_seconds is None
         else min(elapsed, reference.max_elapsed_seconds)
     )
-    watts = (
-        _pair_watts(deltas, allowed_elapsed, aggregate, fields)
-        if aggregate in deltas
-        else _direction_watts(deltas, allowed_elapsed, fields)
-    )
-    if watts is None:
-        return reference
-    if _ordinary_power_is_plausible(watts, deltas, totals):
-        return _pair_reference(report, aggregate, fields)
-    # An unchanged suspect jump must not become plausible solely as clocks advance.
-    return replace(reference, max_elapsed_seconds=allowed_elapsed)
+    if not _counter_advances_are_plausible(deltas, allowed_elapsed, fields, totals):
+        # The directional jump is visible even while the direct aggregate
+        # lags. Retain this time allowance until the jump is resolved.
+        return replace(reference, held=held, max_elapsed_seconds=allowed_elapsed)
+    if any(delta < 0 for delta in deltas.values()) or (
+        aggregate in deltas and not _pair_deltas_reconcile(deltas, aggregate, fields)
+    ):
+        return replace(reference, held=held)
+    return _pair_reference(report, aggregate, fields)
+
+
+def _confirm_pair_revision(
+    reference: DirectionalBatteryPairReference,
+    report: _Report,
+    totals: dict[str, tuple[float, int]],
+    aggregate: str,
+    fields: tuple[str, str],
+    confirmed: set[str],
+) -> DirectionalBatteryPairReference:
+    elapsed = reference.max_elapsed_seconds
+    if elapsed is not None:
+        deltas = {
+            field: 0.0 if field in confirmed else report.wh[field] - reference.wh[field]
+            for field in fields
+        }
+        if not _counter_advances_are_plausible(deltas, elapsed, fields, totals):
+            return reference
+    return _pair_reference(report, aggregate, fields)
 
 
 def _pair_watts(
@@ -314,15 +328,21 @@ def _pair_watts(
     aggregate: str,
     fields: tuple[str, str],
 ) -> dict[str, int] | None:
-    direct = deltas[aggregate]
-    paired = sum(deltas[field] for field in fields)
-    if (
-        direct < 0
-        or (direct == 0) != (paired == 0)
-        or not _pairs_reconcile(direct, paired)
-    ):
+    if not _pair_deltas_reconcile(deltas, aggregate, fields):
         return None
     return _direction_watts(deltas, seconds, fields)
+
+
+def _pair_deltas_reconcile(
+    deltas: Mapping[str, float], aggregate: str, fields: tuple[str, str]
+) -> bool:
+    direct = deltas[aggregate]
+    paired = sum(deltas[field] for field in fields)
+    return (
+        direct >= 0
+        and (direct == 0) == (paired == 0)
+        and _pairs_reconcile(direct, paired)
+    )
 
 
 def _direction_watts(
@@ -339,15 +359,18 @@ def _direction_watts(
     }
 
 
-def _ordinary_power_is_plausible(
-    watts: dict[str, int],
+def _counter_advances_are_plausible(
     deltas: Mapping[str, float],
+    elapsed: float,
+    fields: tuple[str, str],
     totals: dict[str, tuple[float, int]],
 ) -> bool:
-    return all(
+    advances = {field: max(0.0, deltas[field]) for field in fields}
+    watts = _direction_watts(advances, elapsed, fields)
+    return watts is not None and all(
         value < EXTREME_SITE_POWER_W
         and site_power_sample_is_plausible(
-            value, deltas[field] / 1000.0, (totals[field][0] / 1000.0,)
+            value, advances[field] / 1000.0, (totals[field][0] / 1000.0,)
         )
         for field, value in watts.items()
     )
