@@ -592,6 +592,31 @@ def test_profile_match_with_stale_reserve_does_not_clear_local_pending(
     assert coord.battery_effective_backup_percentage == 30
 
 
+def test_full_backup_reserve_readback_requires_fixed_percentage(coordinator_factory):
+    coord = coordinator_factory()
+    runtime = coord.battery_runtime
+    runtime.set_battery_pending(
+        profile="backup_only",
+        reserve=100,
+        sub_type=None,
+        require_reserve_readback=True,
+    )
+
+    runtime.parse_battery_profile_payload(
+        {"profile": "backup_only", "batteryBackupPercentage": 30}
+    )
+    assert coord.battery_profile_pending
+    runtime.parse_battery_profile_payload(
+        {
+            "profile": "backup_only",
+            "batteryBackupPercentage": 100,
+            "batteryBackupPercentageMax": 90,
+        }
+    )
+    assert not coord.battery_profile_pending
+    assert coord.battery_effective_backup_percentage == 100
+
+
 def test_prepopulated_local_target_does_not_confirm_before_profile_read(
     coordinator_factory, monkeypatch
 ) -> None:

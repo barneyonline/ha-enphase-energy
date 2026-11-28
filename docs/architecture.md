@@ -470,6 +470,16 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   representations without inventing missing readback fields. Follow-up profile
   edits use the confirmed profile and companion values shown by the controls.
   Battery reserve writes equal to the confirmed displayed value are no-ops.
+  A reserve edit requires the requested reserve in a Profile response started
+  after acknowledgement. The profile and subtype sent in the accepted request
+  take precedence over the configuration observed at dispatch. If a Savings
+  subtype is unknown, a matching Profile response must supply it. Eligible
+  Settings subtype feedback can retire an expired Profile subtype observation.
+  Confirmation uses the current Profile limits, then known valid limits from
+  the same Profile, then eligible Settings limits for that profile or the site.
+  Settings continues to supply the limits for new writes.
+  Missing, invalid, or unrelated values keep the last numeric reading visible
+  and leave the ten-minute Repair eligible to open.
   Repeating a different pending reserve target reaches the runtime conflict
   guard; after the tracker timeout, retries retain normal write safeguards.
   The reserve number identifies its source as `battery_config` and exposes

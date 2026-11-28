@@ -7,6 +7,7 @@ import copy
 import json
 import re
 import uuid
+from collections.abc import Callable
 from dataclasses import replace
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, cast
@@ -1110,6 +1111,7 @@ async def _battery_config_write_request(
     supports_mqtt: bool | None = None,
     strip_devices: bool = False,
     partial_payload_only: bool = False,
+    on_accepted_profile: Callable[[object, object], None] | None = None,
 ) -> JsonDict:
     """Issue a BatteryConfig write using endpoint-specific compatibility attempts."""
 
@@ -1250,6 +1252,12 @@ async def _battery_config_write_request(
                 attempt.attempt_id,
                 supports_mqtt=supports_mqtt,
             )
+            if on_accepted_profile is not None:
+                assert isinstance(attempt_json_body, dict)
+                on_accepted_profile(
+                    attempt_json_body.get("profile"),
+                    attempt_json_body.get("operationModeSubType"),
+                )
             return cast(JsonDict, result)
     finally:
         self._bp_xsrf_token = None
@@ -1647,6 +1655,7 @@ async def set_battery_settings_compat(
     merged_payload: bool = False,
     strip_devices: bool = False,
     partial_payload_only: bool = False,
+    on_accepted_profile: Callable[[object, object], None] | None = None,
 ) -> JsonDict:
     """Update battery settings using an explicit compatibility payload shape."""
 
@@ -1670,6 +1679,7 @@ async def set_battery_settings_compat(
         supports_mqtt=self._battery_config_supports_mqtt,
         strip_devices=strip_devices,
         partial_payload_only=partial_payload_only,
+        on_accepted_profile=on_accepted_profile,
     )
 
 

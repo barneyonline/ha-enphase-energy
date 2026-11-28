@@ -4,7 +4,7 @@ import asyncio
 import time
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 
 import aiohttp
 import pytest
@@ -241,9 +241,9 @@ async def test_savings_reserve_and_profile_writes_preserve_subtype(
     coordinator_factory, subtype, write
 ) -> None:
     coord = coordinator_factory()
-    coord._battery_profile = "cost_savings"  # noqa: SLF001
-    coord._battery_backup_percentage = 21  # noqa: SLF001
-    coord._battery_operation_mode_sub_type = subtype  # noqa: SLF001
+    coord.battery_runtime.parse_battery_profile_payload(
+        _profile_payload(profile="cost_savings", reserve=21, subtype=subtype)
+    )
     coord._battery_show_savings_mode = True  # noqa: SLF001
     coord._battery_show_charge_from_grid = True  # noqa: SLF001
     coord._battery_show_battery_backup_percentage = True  # noqa: SLF001
@@ -255,7 +255,10 @@ async def test_savings_reserve_and_profile_writes_preserve_subtype(
     if write == "reserve":
         await coord.async_set_battery_reserve(30)
         coord.client.set_battery_settings_compat.assert_awaited_once_with(
-            {"batteryBackupPercentage": 30}, merged_payload=True, strip_devices=True
+            {"batteryBackupPercentage": 30},
+            merged_payload=True,
+            strip_devices=True,
+            on_accepted_profile=ANY,
         )
         coord.client.set_battery_profile.assert_not_awaited()
     else:
@@ -590,6 +593,7 @@ async def test_battery_reserve_write_succeeds_when_role_unknown(
         {"batteryBackupPercentage": 30},
         merged_payload=True,
         strip_devices=True,
+        on_accepted_profile=ANY,
     )
 
 
@@ -703,6 +707,7 @@ async def test_battery_reserve_write_calls_client_set_battery_settings_compat(
         {"batteryBackupPercentage": 30},
         merged_payload=True,
         strip_devices=True,
+        on_accepted_profile=ANY,
     )
 
 
@@ -895,6 +900,7 @@ async def test_battery_reserve_write_direct_helper_refreshes_unknown_write_acces
         {"batteryBackupPercentage": 30},
         merged_payload=True,
         strip_devices=True,
+        on_accepted_profile=ANY,
     )
     assert coord.battery_user_is_owner is True
     assert coord.battery_write_access_confirmed is True
@@ -1813,9 +1819,17 @@ async def test_split_profile_recovery_nudges_reserve_then_restores(
     assert coord.client.set_battery_settings_compat.await_count == 2
     first_call, second_call = coord.client.set_battery_settings_compat.await_args_list
     assert first_call.args[0] == {"batteryBackupPercentage": 25}
-    assert first_call.kwargs == {"merged_payload": True, "strip_devices": True}
+    assert first_call.kwargs == {
+        "merged_payload": True,
+        "strip_devices": True,
+        "on_accepted_profile": None,
+    }
     assert second_call.args[0] == {"batteryBackupPercentage": 20}
-    assert second_call.kwargs == {"merged_payload": True, "strip_devices": True}
+    assert second_call.kwargs == {
+        "merged_payload": True,
+        "strip_devices": True,
+        "on_accepted_profile": None,
+    }
     assert coord._battery_profile_recovery_restore_task is None  # noqa: SLF001
 
 
@@ -2027,14 +2041,20 @@ async def test_battery_profile_setter_validation_and_fallbacks(
 
     coord._battery_user_is_owner = True  # noqa: SLF001
     coord._battery_user_is_installer = False  # noqa: SLF001
-    coord._battery_profile = "cost_savings"  # noqa: SLF001
-    coord._battery_backup_percentage = 25  # noqa: SLF001
-    coord._battery_operation_mode_sub_type = "prioritize-energy"  # noqa: SLF001
+    coord.battery_runtime.parse_battery_profile_payload(
+        _profile_payload(
+            profile="cost_savings", reserve=25, subtype="prioritize-energy"
+        )
+    )
     await coord.async_set_battery_reserve(5)
     args = coord.client.set_battery_settings_compat.await_args.args
     kwargs = coord.client.set_battery_settings_compat.await_args.kwargs
     assert args[0] == {"batteryBackupPercentage": 5}
-    assert kwargs == {"merged_payload": True, "strip_devices": True}
+    assert kwargs == {
+        "merged_payload": True,
+        "strip_devices": True,
+        "on_accepted_profile": ANY,
+    }
     assert coord._battery_pending_sub_type == "prioritize-energy"  # noqa: SLF001
 
     coord._clear_battery_pending()  # noqa: SLF001
@@ -2042,9 +2062,11 @@ async def test_battery_profile_setter_validation_and_fallbacks(
     with pytest.raises(ServiceValidationError, match="Savings profile must be active"):
         await coord.async_set_savings_use_battery_after_peak(False)
 
-    coord._battery_profile = "ai_optimisation"  # noqa: SLF001
-    coord._battery_backup_percentage = 10  # noqa: SLF001
-    coord._battery_operation_mode_sub_type = "prioritize-energy"  # noqa: SLF001
+    coord.battery_runtime.parse_battery_profile_payload(
+        _profile_payload(
+            profile="ai_optimisation", reserve=10, subtype="prioritize-energy"
+        )
+    )
     coord._battery_profile_last_write_mono = time.monotonic() - 10  # noqa: SLF001
     coord._battery_settings_last_write_mono = time.monotonic() - 10  # noqa: SLF001
     coord.client.set_battery_settings_compat.reset_mock()
@@ -2052,7 +2074,11 @@ async def test_battery_profile_setter_validation_and_fallbacks(
     args = coord.client.set_battery_settings_compat.await_args.args
     kwargs = coord.client.set_battery_settings_compat.await_args.kwargs
     assert args[0] == {"batteryBackupPercentage": 5}
-    assert kwargs == {"merged_payload": True, "strip_devices": True}
+    assert kwargs == {
+        "merged_payload": True,
+        "strip_devices": True,
+        "on_accepted_profile": ANY,
+    }
     assert coord._battery_pending_sub_type == "prioritize-energy"  # noqa: SLF001
 
     coord._clear_battery_pending()  # noqa: SLF001

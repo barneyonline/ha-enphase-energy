@@ -429,30 +429,106 @@ def _subset(expected: object, actual: object) -> bool:
     return expected == actual
 
 
+def _held_by_legacy_profile_update(coord: Any, control: str) -> bool:
+    updates = coord.control_updates
+    if updates is None:
+        return False
+    owner = updates.held_by.get((control, None))
+    return owner is not None and owner is not updates.updates.get(
+        ("battery_reserve", None)
+    )
+
+
 def _profile_feedback(
-    coord: Any, control: str, data: dict[str, Any]
+    coord: Any,
+    control: str,
+    family: str,
+    data: dict[str, Any],
+    previous_configured_profile: object,
 ) -> dict[str, object]:
-    """Read only fields present in this response, including explicit null values."""
+    """Read the profile fields supplied by this response."""
     runtime = coord.battery_runtime
+    if family == "battery_settings" and not runtime.settings_profile_readback_allowed:
+        return {}
     ready = not bool(coord.battery_profile_pending)
+    profile = runtime.normalize_battery_profile_key(data.get("profile"))
+    is_profile_companion = control in {
+        "system_profile",
+        "savings_use_battery_after_peak",
+    }
+    reserve_holds_companion = False
+    if is_profile_companion and coord.control_updates is not None:
+        updates = coord.control_updates
+        reserve_update = updates.updates.get(("battery_reserve", None))
+        reserve_holds_companion = (
+            reserve_update is not None
+            and reserve_update is updates.held_by.get((control, None))
+        )
+    if (
+        reserve_holds_companion
+        and profile is not None
+        and profile != coord._battery_profile
+    ):
+        return {}
+    subtype = data.get("operationModeSubType")
+    has_subtype = isinstance(subtype, str) and (subtype == "" or bool(subtype.strip()))
+    if not has_subtype and is_profile_companion:
+        if (
+            reserve_holds_companion
+            and isinstance(previous_configured_profile, str)
+            and profile is not None
+            and profile != previous_configured_profile
+        ):
+            # A held subtype belongs to the configured mode that supplied it.
+            subtype = None
+            has_subtype = True
+        if not has_subtype and "operationModeSubType" in data and subtype is None:
+            # Legacy transitions accept an explicit null. A same-mode Savings
+            # read after an exact reserve edit keeps the associated subtype.
+            configured_profile = (
+                coord._battery_profile if data.get("profile") is None else profile
+            )
+            has_subtype = _held_by_legacy_profile_update(coord, control) or (
+                ready
+                and configured_profile in {"self-consumption", "backup_only"}
+                and configured_profile == coord._battery_profile
+            )
     if control == "system_profile" and "profile" in data:
-        profile = runtime.normalize_battery_profile_key(data["profile"])
-        result: dict[str, object] = {
-            "profile_key": getattr(coord, "battery_live_profile", None) or profile,
-            "configured_profile": profile,
-            "profile_ready": ready,
-        }
-        if "operationModeSubType" in data:
-            result["operation_mode_sub_type"] = data["operationModeSubType"]
+        result: dict[str, object] = {}
+        if not reserve_holds_companion or profile is not None:
+            result.update(
+                profile_key=getattr(coord, "battery_live_profile", None) or profile,
+                configured_profile=profile,
+                profile_ready=ready,
+            )
+        if has_subtype:
+            result["operation_mode_sub_type"] = subtype
         return result
     if control == "battery_reserve" and "batteryBackupPercentage" in data:
+        reserve = runtime.battery_reserve_readback(
+            data, from_profile=family == "storm_guard"
+        )
+        if reserve is None and _held_by_legacy_profile_update(coord, control):
+            raw_reserve = data["batteryBackupPercentage"]
+            if raw_reserve is None or (family == "battery_settings" and not ready):
+                # Settings can supply a companion reserve without confirming
+                # the pending mode change. An explicit null leaves the next
+                # legacy write to use the configured mode's fallback.
+                return {
+                    "reserve": coerce_optional_int(raw_reserve),
+                    "profile_ready": ready,
+                }
+            elif family == "storm_guard" and ready:
+                # A mode or subtype change retains legacy Settings normalization.
+                profile = runtime.normalize_battery_profile_key(data.get("profile"))
+                normalized = runtime.profile_transition_reserve(data, profile)
+                if normalized == coord._battery_backup_percentage:
+                    reserve = normalized
+        if reserve is not None:
+            return {"reserve": reserve, "profile_ready": ready}
+    if control == "savings_use_battery_after_peak" and has_subtype:
         return {
-            "reserve": coerce_optional_int(data["batteryBackupPercentage"]),
-            "profile_ready": ready,
-        }
-    if control == "savings_use_battery_after_peak" and "operationModeSubType" in data:
-        return {
-            "enabled": coord._normalize_battery_sub_type(data["operationModeSubType"])
+            "enabled": coord._normalize_battery_sub_type(subtype)
             == SAVINGS_OPERATION_MODE_SUBTYPE,
             "profile_ready": ready,
         }
@@ -582,7 +658,9 @@ def _schedule_inventory_feedback(data: dict[str, Any]) -> dict[str, object]:
     )
 
 
-def fresh_control_values(coord: Any, control: str, family: str) -> dict[str, object]:
+def fresh_control_values(
+    coord: Any, control: str, family: str, *, previous_configured_profile: object = None
+) -> dict[str, object]:
     """Exclude cached companion fields and values promoted by write bookkeeping."""
     if family == "battery_status":
         return {
@@ -603,7 +681,9 @@ def fresh_control_values(coord: Any, control: str, family: str) -> dict[str, obj
     if not isinstance(data, dict):
         data = payload
     if control in BATTERY_PROFILE_CONTROLS:
-        return _profile_feedback(coord, control, data)
+        return _profile_feedback(
+            coord, control, family, data, previous_configured_profile
+        )
     if control.startswith("battery_schedule_"):
         if family == "battery_settings":
             enabled = {}
@@ -653,7 +733,36 @@ def fresh_control_values(coord: Any, control: str, family: str) -> dict[str, obj
 def observe_control_family(
     coord: Any, family: str, tokens: Mapping[tuple[str, str | None], object]
 ) -> None:
+    updates = coord.control_updates
+    profile_key = ("system_profile", None)
+    previous_configured_profile = updates.values.get(profile_key, {}).get(
+        "configured_profile"
+    )
+    submitted_profile = None
+    reserve_update = updates.updates.get(("battery_reserve", None))
+    if (
+        family in {"battery_settings", "storm_guard"}
+        and reserve_update is not None
+        and updates.held_by.get(profile_key) is reserve_update
+    ):
+        submitted_profile = (
+            coord.battery_runtime.reserve_companion_profile_at_submission
+        )
+        if submitted_profile is not None:
+            previous_configured_profile = submitted_profile
     for control in FAMILY_CONTROLS.get(family, ()):
-        values = fresh_control_values(coord, control, family)
+        values = fresh_control_values(
+            coord,
+            control,
+            family,
+            previous_configured_profile=previous_configured_profile,
+        )
         if values:
-            coord.control_updates.observe(control, None, values, tokens)
+            updates.observe(control, None, values, tokens)
+            if (
+                control == "system_profile"
+                and submitted_profile is not None
+                and tokens.get(profile_key) is reserve_update.read_token
+                and isinstance(values.get("configured_profile"), str)
+            ):
+                coord.battery_runtime.reserve_companion_profile_at_submission = None
