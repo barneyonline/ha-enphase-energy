@@ -11,6 +11,7 @@ from .const import CLOUD_TELEMETRY_STALE_AFTER_S
 from .directional_battery_energy import _AGGREGATE_PAIRS, _FIELDS, _pairs_reconcile
 from .power_average import EnergyPowerAverage
 from .power_validation import (
+    EXTREME_SITE_POWER_W,
     ExtremePowerValidator,
     _energy_delta_to_power_w,
     site_power_sample_is_plausible,
@@ -53,18 +54,30 @@ class DirectionalBatteryPower:
         self._minimum_window_seconds = minimum_window_seconds
         self._baseline: _Report | None = None
         self._last_report: _Report | None = None
-        self._recovery_reference: _Report | None = None
+        self._recovery_references: dict[str, _Report] = {}
         self._dropout_watermarks: dict[str, dict[str, float]] = {}
         self._validators = {field: ExtremePowerValidator() for field in _FIELDS}
         self._averages = {field: EnergyPowerAverage() for field in _FIELDS}
+        self._next_interval: DirectionalBatteryPowerReading | None = None
+        self._next_average: DirectionalBatteryPowerReading | None = None
         self.qualified = False
         self.interval: DirectionalBatteryPowerReading | None = None
         self.average: DirectionalBatteryPowerReading | None = None
 
     def invalidate(self) -> None:
         """Discard the window while retaining the source timestamp watermark."""
+        self._reset_window()
+        self.publish()
+
+    def publish(self) -> None:
+        """Expose the staged window after the source checkpoint is acknowledged."""
+        self.interval = self._next_interval
+        self.average = self._next_average
+        self.qualified |= self.interval is not None
+
+    def _reset_window(self) -> None:
         self._baseline = None
-        self.interval = self.average = None
+        self._next_interval = self._next_average = None
         for field in _FIELDS:
             self._validators[field].clear()
             self._averages[field].clear()
@@ -93,7 +106,7 @@ class DirectionalBatteryPower:
                 or isinstance(raw := buckets[bucket_count - 1], bool)
                 or (value := coerce_bucket(raw)) is None
             ):
-                self.invalidate()
+                self._reset_window()
                 return
             wh[field] = value
         self._observe(
@@ -113,21 +126,16 @@ class DirectionalBatteryPower:
         previous = self._last_report
         if previous is not None and report.reported_at <= previous.reported_at:
             if report != previous:
-                self.invalidate()
+                self._reset_window()
             return
         self._last_report = report
-        recovering = bool(self._dropout_watermarks)
         rollover = previous is not None and report.bucket_count != previous.bucket_count
         if rollover:
             self._dropout_watermarks.clear()
-        else:
-            self._track_dropouts(
-                report, self._recovery_reference or previous, startup_wh
-            )
-        if previous is None or rollover or recovering or self._dropout_watermarks:
-            self._recovery_reference = report
+            self._recovery_references.clear()
+        self._track_dropouts(report, totals, startup_wh if previous is None else None)
         if self._dropout_watermarks:
-            self.invalidate()
+            self._reset_window()
             return
         baseline = self._baseline
         if (
@@ -144,7 +152,7 @@ class DirectionalBatteryPower:
                 )
             )
         ):
-            self.invalidate()
+            self._reset_window()
             self._baseline = report
             return
 
@@ -154,21 +162,14 @@ class DirectionalBatteryPower:
         deltas = {
             field: value - baseline.wh[field] for field, value in report.wh.items()
         }
-        for total, (left, right) in _AGGREGATE_PAIRS.items():
-            direct = deltas[total]
-            pair = deltas[left] + deltas[right]
-            if (direct == 0) != (pair == 0) or not _pairs_reconcile(direct, pair):
-                self.invalidate()
+        watts: dict[str, int] = {}
+        for aggregate, fields in _AGGREGATE_PAIRS.items():
+            pair_watts = _pair_watts(deltas, seconds, aggregate, fields)
+            if pair_watts is None:
+                self._reset_window()
                 return
-
-        if not all(math.isfinite(deltas[field] * 3600.0) for field in _FIELDS):
-            self.invalidate()
-            return
+            watts.update(pair_watts)
         self._baseline = report
-        watts = {
-            field: _energy_delta_to_power_w(deltas[field] / 1000.0, window_s=seconds)
-            for field in _FIELDS
-        }
         validation = {
             field: validator.evaluate(
                 watts[field], sample_ts=report.reported_at.timestamp()
@@ -185,20 +186,19 @@ class DirectionalBatteryPower:
             )
             for field, result in validation.items()
         ):
-            self.interval = self.average = None
+            self._next_interval = self._next_average = None
             for average in self._averages.values():
                 average.clear()
             return
 
-        self.qualified = True
-        self._recovery_reference = report
-        self.interval = DirectionalBatteryPowerReading(
+        self._recovery_references = dict.fromkeys(_AGGREGATE_PAIRS, report)
+        self._next_interval = DirectionalBatteryPowerReading(
             report.reported_at, seconds, watts
         )
         if any(result.confirmed_extreme for result in validation.values()):
             for average in self._averages.values():
                 average.clear()
-            self.average = self.interval
+            self._next_average = self._next_interval
             return
         averaged_watts: dict[str, int] = {}
         window = seconds
@@ -215,49 +215,90 @@ class DirectionalBatteryPower:
             value = average.value()
             assert value is not None
             averaged_watts[field], window = value
-        self.average = DirectionalBatteryPowerReading(
+        self._next_average = DirectionalBatteryPowerReading(
             report.reported_at, window, averaged_watts
         )
 
     def _track_dropouts(
         self,
         report: _Report,
-        previous: _Report | None,
+        totals: dict[str, tuple[float, int]],
         startup_wh: Mapping[str, float] | None,
     ) -> None:
         """Require the entire affected pair to recover before reseeding."""
         for aggregate, fields in _AGGREGATE_PAIRS.items():
-            if (watermarks := self._dropout_watermarks.get(aggregate)) is not None:
-                if all(
-                    report.wh[field] >= value for field, value in watermarks.items()
-                ):
-                    del self._dropout_watermarks[aggregate]
-            elif previous is not None:
-                if report.wh[aggregate] < previous.wh[aggregate] and any(
-                    report.wh[field] < previous.wh[field] for field in fields
-                ):
-                    self._dropout_watermarks[aggregate] = {
-                        field: previous.wh[field] for field in (aggregate, *fields)
-                    }
-            elif startup_wh is not None:
+            pair = (aggregate, *fields)
+            previous = self._recovery_references.get(aggregate)
+            if previous is None:
                 saved = {
                     field: startup_wh[field]
-                    for field in (aggregate, *fields)
-                    if field in startup_wh
+                    for field in pair
+                    if startup_wh is not None and field in startup_wh
                 }
                 if any(report.wh[field] < value for field, value in saved.items()):
                     self._dropout_watermarks[aggregate] = saved
+                self._recovery_references[aggregate] = report
+                continue
+            if (watermarks := self._dropout_watermarks.get(aggregate)) is not None:
+                if any(report.wh[field] < value for field, value in watermarks.items()):
+                    continue
+                del self._dropout_watermarks[aggregate]
+            elif report.wh[aggregate] < previous.wh[aggregate] and any(
+                report.wh[field] < previous.wh[field] for field in fields
+            ):
+                self._dropout_watermarks[aggregate] = {
+                    field: previous.wh[field] for field in pair
+                }
+                continue
+
+            # Qualify this pair's recovery reference independently. This
+            # also guards subminimum reports without publishing watts early.
+            elapsed = (report.reported_at - previous.reported_at).total_seconds()
+            deltas = {field: report.wh[field] - previous.wh[field] for field in pair}
+            watts = _pair_watts(deltas, elapsed, aggregate, fields)
+            if watts is not None and all(
+                value < EXTREME_SITE_POWER_W
+                and site_power_sample_is_plausible(
+                    value, deltas[field] / 1000.0, (totals[field][0] / 1000.0,)
+                )
+                for field, value in watts.items()
+            ):
+                self._recovery_references[aggregate] = report
 
     def recovery_wh(self, reported_at: datetime) -> dict[str, float] | None:
         """Checkpoint raw counters and pre-drop values without saving watts."""
         report = self._last_report
         if report is None or report.reported_at != reported_at:
             return None
-        # A revision or unconfirmed outlier can move the calculation baseline
-        # before the next trustworthy report. Retain the earlier guard.
-        reference = self._recovery_reference
-        assert reference is not None
-        wh = reference.wh.copy()
+        wh = {
+            field: self._recovery_references[aggregate].wh[field]
+            for aggregate, fields in _AGGREGATE_PAIRS.items()
+            for field in (aggregate, *fields)
+        }
         for watermarks in self._dropout_watermarks.values():
             wh.update(watermarks)
         return wh
+
+
+def _pair_watts(
+    deltas: Mapping[str, float],
+    seconds: float,
+    aggregate: str,
+    fields: tuple[str, str],
+) -> dict[str, int] | None:
+    direct = deltas[aggregate]
+    paired = sum(deltas[field] for field in fields)
+    if (
+        (direct == 0) != (paired == 0)
+        or not _pairs_reconcile(direct, paired)
+        or not all(
+            deltas[field] >= 0 and math.isfinite(deltas[field] * 3600.0 / seconds)
+            for field in fields
+        )
+        or direct < 0
+    ):
+        return None
+    return {
+        field: _energy_delta_to_power_w(deltas[field] / 1000.0, window_s=seconds)
+        for field in fields
+    }

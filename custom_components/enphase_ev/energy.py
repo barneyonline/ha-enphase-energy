@@ -18,7 +18,10 @@ from homeassistant.util import dt as dt_util
 from .api import SiteEnergyUnavailable, guarded_read_scope
 from .cloud_retry import retry_after_delay, transient_backoff_delay
 from .const import CLOUD_TELEMETRY_STALE_AFTER_S, DIRECTIONAL_BATTERY_ENERGY_FIELDS
-from .directional_battery_energy import DirectionalBatteryEnergy
+from .directional_battery_energy import (
+    SITE_ENERGY_SOURCE_FUTURE_SKEW_S,
+    DirectionalBatteryEnergy,
+)
 from .directional_battery_power import (
     DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED,
     DirectionalBatteryPower,
@@ -33,7 +36,6 @@ LIFETIME_CONFIRM_TOLERANCE_KWH = 0.05
 LIFETIME_CONFIRM_COUNT = 2
 LIFETIME_CONFIRM_WINDOW_S = 180.0
 SITE_ENERGY_CACHE_TTL = 300.0
-SITE_ENERGY_SOURCE_FUTURE_SKEW_S = 60.0
 SITE_ENERGY_DEFAULT_INTERVAL_MIN = 5.0
 DAILY_ENERGY_BUCKET_MINUTES = 24 * 60
 SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
@@ -1359,14 +1361,21 @@ class EnergyManager:
                     if not await self._directional_battery.async_save(power_wh):
                         directional_totals = {}
                         power_totals = {}
+                except asyncio.CancelledError:
+                    if power is not None:
+                        power.invalidate()
+                    raise
                 finally:
                     self._directional_battery_save_idle.set()
             if self._site_energy_read_superseded(generation):
                 if power is not None:
                     power.invalidate()
                 return
-        if power is not None and not power_totals:
-            power.invalidate()
+        if power is not None:
+            if power_totals:
+                power.publish()
+            else:
+                power.invalidate()
         parsed = (
             None
             if malformed_source

@@ -6,7 +6,7 @@ import logging
 import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timezone, tzinfo
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
 from sys import float_info
 
@@ -25,6 +25,7 @@ _AGGREGATE_PAIRS = {
     "charge": ("grid_battery", "solar_battery"),
     "discharge": ("battery_home", "battery_grid"),
 }
+SITE_ENERGY_SOURCE_FUTURE_SKEW_S = 60.0
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -129,6 +130,80 @@ class _BatteryHistory:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class _PowerCheckpoint:
+    """Source identity and trusted raw readings kept across a reload."""
+
+    start: str
+    timezone: str
+    reported_at: datetime
+    size: int
+    closed_signature: str
+    wh: dict[str, float]
+
+    def same_source(self, history: _BatteryHistory) -> bool:
+        return (
+            self.start == history.start.isoformat()
+            and self.timezone == history.timezone
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "start": self.start,
+            "timezone": self.timezone,
+            "reported_at": self.reported_at.isoformat(),
+            "size": self.size,
+            "closed_signature": self.closed_signature,
+            "wh": self.wh,
+        }
+
+    @classmethod
+    def from_dict(cls, data: object) -> _PowerCheckpoint | None:
+        if not isinstance(data, dict):
+            return None
+        start = data.get("start")
+        zone_name = data.get("timezone")
+        size = data.get("size")
+        signature = data.get("closed_signature")
+        raw_clock = data.get("reported_at")
+        wh = data.get("wh")
+        if (
+            not isinstance(start, str)
+            or not isinstance(zone_name, str)
+            or type(size) is not int
+            or size < 1
+            or not isinstance(signature, str)
+            or len(signature) != 64
+            or not isinstance(raw_clock, str)
+            or not isinstance(wh, dict)
+        ):
+            return None
+        try:
+            reported_at = datetime.fromisoformat(raw_clock)
+        except ValueError:
+            return None
+        if reported_at.tzinfo is None or reported_at > dt_util.utcnow() + timedelta(
+            seconds=SITE_ENERGY_SOURCE_FUTURE_SKEW_S
+        ):
+            return None
+        counters = {}
+        for field in (*_FIELDS, *_AGGREGATE_PAIRS):
+            value = wh.get(field)
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not 0 <= value <= float_info.max
+            ):
+                return None
+            counters[field] = float(value)
+        return cls(start, zone_name, reported_at, size, signature, counters)
+
+
+def _closed_signature(history: _BatteryHistory, size: int) -> str:
+    closed = history.closed_buckets[: size - 1]
+    return sha256(repr(closed).encode()).hexdigest()
+
+
 class DirectionalBatteryEnergy:
     """Accept only independently corroborated, continuous lifetime coverage."""
 
@@ -151,7 +226,7 @@ class DirectionalBatteryEnergy:
         self._loaded = store is None
         self._history: _BatteryHistory | None = None
         self._saved_history: _BatteryHistory | None = None
-        self._saved_power_checkpoint: dict[str, object] | None = None
+        self._saved_power_checkpoint: _PowerCheckpoint | None = None
         self._power_source_history: _BatteryHistory | None = None
         self._pending_power_source_history: _BatteryHistory | None = None
         self._load_warning_logged = False
@@ -193,10 +268,10 @@ class DirectionalBatteryEnergy:
             if self._history is None:
                 self._warn_load_once("Invalid directional battery energy history")
                 return
-            if isinstance(saved, dict) and isinstance(
-                checkpoint := saved.get("power"), dict
-            ):
-                self._saved_power_checkpoint = checkpoint
+            assert isinstance(saved, dict)
+            self._saved_power_checkpoint = _PowerCheckpoint.from_dict(
+                saved.get("power")
+            )
         elif self._has_previous_entities is not None and self._has_previous_entities():
             # Core can also return None after renaming a corrupt storage file.
             # An existing entity may still have Recorder history to protect.
@@ -214,13 +289,14 @@ class DirectionalBatteryEnergy:
         power_source = self._power_source_history
         if power_wh is not None:
             assert power_source is not None
-            checkpoint = {
-                "start": power_source.start.isoformat(),
-                "timezone": power_source.timezone,
-                "size": power_source.size,
-                "reported_at": power_source.reported_at.timestamp(),
-                "wh": power_wh,
-            }
+            checkpoint = _PowerCheckpoint(
+                power_source.start.isoformat(),
+                power_source.timezone,
+                power_source.reported_at,
+                power_source.size,
+                _closed_signature(power_source, power_source.size),
+                power_wh,
+            )
         if (
             self._store is None
             or history is None
@@ -232,7 +308,7 @@ class DirectionalBatteryEnergy:
             return True
         data = history.as_dict()
         if checkpoint is not None:
-            data["power"] = checkpoint
+            data["power"] = checkpoint.as_dict()
         try:
             await self._store.async_save(data)
         except (HomeAssistantError, OSError):
@@ -269,11 +345,6 @@ class DirectionalBatteryEnergy:
             return {}
         history, count = result
         if for_power:
-            checkpoint = self._saved_power_checkpoint
-            if previous is None and checkpoint is not None:
-                saved_clock = self._coerce_bucket(checkpoint.get("reported_at"))
-                if saved_clock is not None and reported_at.timestamp() < saved_clock:
-                    return {}
             if not self._accept_power_source_history(history):
                 return {}
         else:
@@ -285,15 +356,25 @@ class DirectionalBatteryEnergy:
         pending = self._pending_power_source_history
         if pending is not None and history.reported_at <= pending.reported_at:
             return False
-        if (
-            previous is not None
-            and history.closed_buckets[: len(previous.closed_buckets)]
-            != previous.closed_buckets
-            and (
-                pending is None
-                or history.closed_buckets[: len(pending.closed_buckets)]
-                != pending.closed_buckets
+        changed = False
+        if previous is not None:
+            changed = (
+                history.closed_buckets[: len(previous.closed_buckets)]
+                != previous.closed_buckets
             )
+        elif (
+            checkpoint := self._saved_power_checkpoint
+        ) is not None and checkpoint.same_source(history):
+            if history.reported_at <= checkpoint.reported_at:
+                return False
+            changed = (
+                _closed_signature(history, checkpoint.size)
+                != checkpoint.closed_signature
+            )
+        if changed and (
+            pending is None
+            or history.closed_buckets[: len(pending.closed_buckets)]
+            != pending.closed_buckets
         ):
             # A new version of closed history must persist at an advancing
             # cursor. Reject this report so no window spans the correction.
@@ -310,18 +391,10 @@ class DirectionalBatteryEnergy:
         checkpoint = self._saved_power_checkpoint
         if (
             checkpoint is not None
-            and current.start.isoformat() == checkpoint.get("start")
-            and current.timezone == checkpoint.get("timezone")
-            and current.size == checkpoint.get("size")
-            and isinstance(raw := checkpoint.get("wh"), dict)
+            and checkpoint.same_source(current)
+            and current.size == checkpoint.size
         ):
-            counters = {
-                field: value
-                for field in (*_FIELDS, *_AGGREGATE_PAIRS)
-                if (value := self._coerce_bucket(raw.get(field))) is not None
-            }
-            if len(counters) == len(_FIELDS) + len(_AGGREGATE_PAIRS):
-                return counters
+            return checkpoint.wh
         saved = self._saved_history
         if (
             saved is None

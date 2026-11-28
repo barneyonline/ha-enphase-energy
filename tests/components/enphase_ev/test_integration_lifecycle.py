@@ -449,6 +449,8 @@ async def test_directional_battery_power_platform_lifecycle(
     await _finish_startup(hass, config_entry)
     coord = config_entry.runtime_data.coordinator
     assert_group()
+    await publish()
+    assert_group()
     await publish(grid_battery=[12150], charge=[12460])
     assert_group((600, 0, 0, 0))
     await publish(report_lag=6)

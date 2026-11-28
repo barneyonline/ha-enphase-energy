@@ -1,5 +1,6 @@
 """Replay constructed daily lifetime reports at source precision."""
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -64,6 +65,7 @@ def replay():
             },
             manager._coerce_lifetime_bucket,
         )
+        power.publish()
         return power
 
     return report
@@ -156,6 +158,7 @@ async def test_interrupted_lifetime_save_breaks_the_power_window(
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()
     manager = coordinator_factory(client=SimpleNamespace(lifetime_energy=read)).energy
+
     async def save_history(power_wh):
         if now == _START + timedelta(minutes=15):
             if superseded:
@@ -194,6 +197,73 @@ async def test_interrupted_lifetime_save_breaks_the_power_window(
     await refresh(1200)
     assert power.interval.watts["grid_battery"] == 600
     assert power.average == power.interval
+
+
+@pytest.mark.parametrize(
+    ("save_result", "power_enabled"),
+    [("success", True), ("failure", True), ("cancel", True), ("cancel", False)],
+)
+async def test_power_publication_waits_for_storage_ack(
+    coordinator_factory, monkeypatch, save_result, power_enabled
+):
+    monkeypatch.setattr(
+        energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", power_enabled
+    )
+    now = _START
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    read = AsyncMock()
+    manager = coordinator_factory(client=SimpleNamespace(lifetime_energy=read)).energy
+    power = manager.directional_battery_power
+    saving = asyncio.Event()
+    finish_save = asyncio.Event()
+
+    async def save_history(_power_wh):
+        if now == _START:
+            return True
+        saving.set()
+        await finish_save.wait()
+        return save_result != "failure"
+
+    monkeypatch.setattr(manager._directional_battery, "async_save", save_history)
+
+    def payload(grid):
+        return {
+            "start_date": now.date().isoformat(),
+            "last_report_date": now.timestamp(),
+            "grid_battery": [grid],
+            "solar_battery": [0],
+            "battery_home": [0],
+            "battery_grid": [0],
+            "charge": [grid],
+            "discharge": [0],
+        }
+
+    read.return_value = payload(1000)
+    await manager._async_refresh_site_energy(force=True)
+    now += timedelta(minutes=5)
+    read.return_value = payload(1050)
+    refresh = asyncio.create_task(manager._async_refresh_site_energy(force=True))
+    await asyncio.wait_for(saving.wait(), timeout=5)
+    if power_enabled:
+        assert power.interval is power.average is None
+        assert not power.qualified
+    else:
+        assert power is None
+    if save_result == "cancel":
+        refresh.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await refresh
+    else:
+        finish_save.set()
+        await refresh
+    if not power_enabled:
+        return
+    if save_result == "success":
+        assert power.interval.watts["grid_battery"] == 600
+        assert power.qualified
+    else:
+        assert power.interval is power.average is None
+        assert not power.qualified
 
 
 def test_smoothing_uses_elapsed_time_and_interpolates_left_edge(replay):
@@ -321,8 +391,52 @@ def test_rejected_outlier_cannot_pin_the_dropout_guard(replay):
     assert replay(1200, grid=1150).interval.watts["grid_battery"] == 600
 
 
+def test_rejected_outlier_in_other_pair_cannot_pin_the_dropout_guard(replay):
+    replay(0)
+    assert replay(300).interval is not None
+    assert replay(600, grid=0).interval is None
+    assert replay(900, grid=750, home=200000).interval is None
+    assert replay(1200).interval is None
+    assert replay(1500, grid=1050).interval.watts["grid_battery"] == 600
+
+
+def test_recovery_guard_tracks_trusted_subminimum_reports(replay):
+    replay(0)
+    assert replay(300, grid=1050).interval.watts["grid_battery"] == 600
+    assert replay(450, grid=1150).interval.watts["grid_battery"] == 600
+    assert replay(600, grid=1100).interval is None
+    assert replay(900, grid=1150).interval is None
+    assert replay(1200, grid=1200).interval.watts["grid_battery"] == 600
+
+
+def test_staggered_discharge_drop_during_charge_recovery(replay):
+    replay(0, grid=1050)
+    assert replay(300, grid=1050).interval is not None
+    for seconds, grid, home, discharge in (
+        (600, 0, 2900, 7000),
+        (900, 0, 2900, 6900),
+        (1200, 1050, 2900, 6900),
+        (1500, 1050, 3000, 7000),
+    ):
+        assert (
+            replay(seconds, grid=grid, home=home, discharge=discharge).interval is None
+        )
+    assert replay(1800, grid=1050, home=3050).interval.watts["battery_home"] == 600
+
+
 @pytest.mark.parametrize(
-    "history_kind", ["legacy", "corrupt_checkpoint", "power", "closed_revision"]
+    "history_kind",
+    [
+        "legacy",
+        "corrupt_checkpoint",
+        "numeric_clock",
+        "bad_clock",
+        "future_clock",
+        "naive_clock",
+        "power",
+        "closed_revision",
+        "revision_during_reload",
+    ],
 )
 async def test_reload_during_dropout_uses_saved_same_day_counters(
     coordinator_factory, monkeypatch, history_kind
@@ -353,12 +467,17 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
     manager = new_manager()
     closed_grid = 500
 
-    async def refresh(seconds, grid):
+    async def refresh(seconds, grid, *, receipt_seconds=None):
         nonlocal now
-        now = _START + timedelta(seconds=seconds)
+        reported_at = _START + timedelta(seconds=seconds)
+        now = (
+            reported_at
+            if receipt_seconds is None
+            else _START + timedelta(seconds=receipt_seconds)
+        )
         read.return_value = {
             "start_date": (_START.date() - timedelta(days=1)).isoformat(),
-            "last_report_date": now.timestamp(),
+            "last_report_date": reported_at.timestamp(),
             "grid_battery": [closed_grid, grid],
             "solar_battery": [0, 2000],
             "battery_home": [0, 0],
@@ -382,13 +501,30 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         del saved["power"]
     elif history_kind == "corrupt_checkpoint":
         del saved["power"]["wh"]["charge"]
+    elif history_kind == "numeric_clock":
+        saved["power"]["reported_at"] = 1e300
+    elif history_kind == "bad_clock":
+        saved["power"]["reported_at"] = "1e300"
+    elif history_kind == "future_clock":
+        saved["power"]["reported_at"] = "9999-12-31T08:00:00+00:00"
+    elif history_kind == "naive_clock":
+        saved["power"]["reported_at"] = "2026-09-05T12:05:00"
 
     manager = new_manager()
-    assert await refresh(150, 1000) is None
+    latest_clock = 1200 if history_kind == "closed_revision" else 300
+    assert await refresh(150, 1000, receipt_seconds=latest_clock + 1) is None
+    if history_kind == "power":
+        assert await refresh(300, 1000, receipt_seconds=latest_clock + 2) is None
+    if history_kind == "revision_during_reload":
+        closed_grid = 450
+        assert await refresh(600, 1100) is None
+        assert await refresh(900, 1150) is None
+        assert (await refresh(1200, 1200)).watts["grid_battery"] == 600
+        return
     if history_kind == "closed_revision":
         # This clock is newer than the cumulative baseline and older than the
         # last power checkpoint. It must not lower the restart guard.
-        assert await refresh(1050, 850) is None
+        assert await refresh(1050, 850, receipt_seconds=latest_clock + 2) is None
         assert saved["power"]["wh"]["grid_battery"] == 1300
     recovery = 1300 if history_kind == "closed_revision" else 1050
     for seconds, grid in (

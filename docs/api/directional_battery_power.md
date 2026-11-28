@@ -28,8 +28,10 @@ directions and the direct aggregate in the affected pair to recover to their
 pre-drop levels or for the site to enter a new day. It then seeds again. The
 integration saves raw counters for restart protection separately from the
 cumulative energy baseline. A revision to a closed day needs a second
-advancing report with the same revised history before power can reseed. The
-cumulative energy history retains its own persisted baseline. The group stops
+advancing report with the same revised history before power can reseed,
+including on reload. A new window is visible after its restart checkpoint
+has been saved. The cumulative energy history retains its own persisted
+baseline. The group stops
 reporting after 30 minutes without a fresh accepted window.
 **Use 15-minute Power Average** applies the same rolling,
 elapsed-time-weighted averaging used by Battery Power. Cloud updates can arrive
