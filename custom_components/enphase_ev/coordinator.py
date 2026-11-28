@@ -1113,6 +1113,8 @@ class EnphaseCoordinator(
             data_supplier=lambda: self.data,
             publish_callback=self.publish_enrichment,
             site_id_getter=lambda: self.site_id,
+            runtime_active=lambda: self.runtime_active,
+            publication_day=self._session_history_day,
             logger=_LOGGER,
         )
         self.heatpump_runtime = HeatpumpRuntime(self, state=self.heatpump_state)
@@ -1710,6 +1712,11 @@ class EnphaseCoordinator(
         """Record a runtime-owned endpoint failure and apply shared backoff."""
 
         return self._note_endpoint_family_failure(family, err)
+
+    def endpoint_family_next_retry_mono(self, family: str) -> float | None:
+        """Return the monotonic deadline shared by readers of an endpoint."""
+
+        return self._endpoint_family_next_retry_mono(family)
 
     def _endpoint_family_policy(self, family: str) -> EndpointFamilyPolicy | None:
         return self._endpoint_family_policies.get(family)

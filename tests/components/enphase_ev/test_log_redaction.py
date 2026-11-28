@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from custom_components.enphase_ev.log_redaction import (
     _key_kind,
+    prepare_identifier_redaction,
     redact_identifier,
     redact_site_id,
     redact_text,
@@ -175,3 +176,18 @@ def test_redact_quoted_identifiers_preserves_already_redacted_values() -> None:
     assert '"uuid": "**REDACTED**"' in redacted
     assert '"reason": "connection lost"' in redacted
     assert redact_text(redacted) == redacted
+
+
+def test_prepared_identifier_redaction_uses_longest_literal_match() -> None:
+    short = "ABC+12"
+    long = "ABC+12345678"
+    later = "ABC+12345678-X"
+    replace = prepare_identifier_redaction([short, long, short, "", later])
+    assert replace(f"{later} {long} {short}") == (
+        f"{redact_identifier(later)} {redact_identifier(long)} {redact_identifier(short)}"
+    )
+    assert replace("ABCX12345678 ABC+1") == "ABCX12345678 ABC+1"
+    assert (
+        redact_text(f"{long} token=example", replace_identifiers=replace)
+        == f"{redact_identifier(long)} token=[redacted]"
+    )

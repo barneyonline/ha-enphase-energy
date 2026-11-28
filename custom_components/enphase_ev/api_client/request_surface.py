@@ -49,6 +49,7 @@ from .common import (
     _timed_response_text,
     check_enlighten_read_admission,
     check_enlighten_read_current,
+    check_guarded_read_response,
     guarded_read_allows_reauth,
     has_guarded_read_scope,
 )
@@ -554,8 +555,8 @@ async def _guard_enlighten_read_response(
 
     response = await handler(request)
     try:
-        check_enlighten_read_current()
-    except EnlightenReadSuperseded:
+        check_guarded_read_response(response)
+    except (EnlightenReadSuperseded, aiohttp.ClientResponseError):
         response.close()
         raise
     return response

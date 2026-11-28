@@ -943,6 +943,26 @@ regressions assert bounded work and reuse rather than machine-specific timings.
 repeated-page detection, and completeness within the five-page budget. A valid
 empty result remains authoritative. Invalid or incomplete fetches reuse valid
 cached history; diagnostics expose only counts and categorical outcomes.
+Session history shares in-flight pagination for the same charger and local date.
+Different dates can load independently, and background publication checks the
+date selected by the charger's current state.
+The site-wide filter criteria lock also protects publishing Retry-After. Session
+reads recheck eligibility after transport queueing, and blocked callers can reuse
+stale results during cooldown. A sent read's HTTP 429 still applies to the active
+site after inventory prunes its charger. Retired acquisitions cannot update
+charger caches or publish their results.
+
+System Events builds one serial redactor per payload, one issue-registry snapshot
+per alarm reconciliation, and at most 20 projected rows per sensor display read.
+Calendar queries can reuse a fresh, complete containing range in the same locale.
+Reads follow the provider's cursors to exhaustion or the existing safety bounds
+because older pages can contain events that overlap the requested interval.
+A different range with missing or incomplete coverage starts a fresh provider
+scan. Concurrent queries can share a same-locale scan they were already waiting
+for. The background availability probe skips an active or queued scan so normal
+coordinator refreshes do not wait on calendar pagination. A scan stopped at a safety bound reports incomplete coverage. If a later
+page fails, validated matches can serve only the exact range through its
+cooldown.
 
 `FirmwareCatalogManager` is shared by catalog URL within a Home Assistant instance.
 Concurrent refreshes share one acquisition and consumers receive detached data,

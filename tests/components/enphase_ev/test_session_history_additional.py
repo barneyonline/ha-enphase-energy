@@ -452,7 +452,8 @@ async def test_session_enrichment_empty_result_cleans_inflight(hass, monkeypatch
     monkeypatch.setattr(manager, "_async_enrich_sessions", AsyncMock(return_value={}))
     manager.schedule_enrichment(["EV"], day_local=datetime.now(timezone.utc))
     await hass.async_block_till_done()
-    assert not manager._refresh_in_progress
+    assert manager.in_progress == 0
+    assert not manager._serial_read_scopes
     assert manager._normalize_serials([" ", "EV"]) == {"EV"}
 
 

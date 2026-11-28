@@ -6,9 +6,10 @@ import asyncio
 import logging
 import time
 import uuid
-from dataclasses import dataclass
+from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone as _tz
-from typing import Any, Awaitable, Callable, Iterable, Protocol, cast
+from typing import Any, Awaitable, Callable, Iterable, Iterator, Protocol, cast
 
 import aiohttp
 from homeassistant.core import HomeAssistant
@@ -19,7 +20,9 @@ from .api import (
     SessionHistoryUnavailable,
     Unauthorized,
     enlighten_optional_read_scope,
+    guarded_read_scope,
 )
+from .api_client.errors import EnlightenReadSuperseded
 from .cloud_retry import retry_after_delay
 from .log_redaction import redact_identifier, redact_text
 from .request_metrics import request_metrics_scope
@@ -68,6 +71,21 @@ class SessionCacheEntry:
     has_valid_cache: bool
 
 
+@dataclass(slots=True)
+class _SerialReadScope:
+    epoch: object
+    readers: int = 0
+    scheduled_days: set[str] = field(default_factory=set)
+    retired: bool = False
+
+
+class _HistoryReadDeferred(Exception):
+    """The site cooldown started before transport could send this read."""
+
+
+_SessionRead = asyncio.Future[list[dict[str, Any]] | None]
+
+
 class SessionHistoryManager:
     """Encapsulate session history caching, fetching, and enrichment."""
 
@@ -83,6 +101,8 @@ class SessionHistoryManager:
         data_supplier: Callable[[], dict[str, dict[str, Any]] | None] | None = None,
         publish_callback: Callable[[dict[str, dict[str, Any]]], None] | None = None,
         site_id_getter: Callable[[], object] | None = None,
+        runtime_active: Callable[[], bool] = lambda: True,
+        publication_day: Callable[[dict[str, Any], datetime], datetime] | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         self._hass = hass
@@ -97,12 +117,16 @@ class SessionHistoryManager:
             tuple[str, str], SessionCacheEntry | tuple[float, list[dict[str, Any]]]
         ] = {}
         self._block_until: dict[str, float] = {}
-        self._refresh_in_progress: set[str] = set()
         self._criteria_checked_mono: float | None = None
         self._criteria_lock = asyncio.Lock()
+        self._session_reads: dict[tuple[str, str], _SessionRead] = {}
+        self._serial_read_scopes: dict[str, _SerialReadScope] = {}
+        self._runtime_epoch = object()
+        self._runtime_active = runtime_active
         self._enrichment_tasks: set[asyncio.Task[None]] = set()
         self._data_supplier = data_supplier
         self._publish_callback = publish_callback
+        self._publication_day = publication_day
         self._site_id_getter = site_id_getter
         self._logger = logger or _LOGGER
         self._fetch_override: SessionFetchCallback | None = None
@@ -131,6 +155,14 @@ class SessionHistoryManager:
         return (site_id,) if site_id else ()
 
     def _redact_error(self, err: object) -> str:
+        response_error = (
+            err.__cause__ if isinstance(err, SessionHistoryUnavailable) else err
+        )
+        if (
+            isinstance(response_error, aiohttp.ClientResponseError)
+            and response_error.status == 429
+        ):
+            return "Session history rate limited"
         return str(redact_text(err, site_ids=self._site_ids()))
 
     @property
@@ -172,7 +204,9 @@ class SessionHistoryManager:
     @property
     def in_progress(self) -> int:
         """Return the number of serials going through enrichment."""
-        return len(self._refresh_in_progress)
+        return sum(
+            bool(scope.scheduled_days) for scope in self._serial_read_scopes.values()
+        )
 
     @property
     def service_available(self) -> bool:
@@ -234,14 +268,22 @@ class SessionHistoryManager:
         self._service_failures += 1
         self._service_last_error = reason
         self._service_last_failure_utc = dt_util.utcnow()
-        self._service_using_stale = using_stale
+        self._service_using_stale = using_stale or (
+            self._service_using_stale and self._service_backoff_active()
+        )
         self._service_last_payload_signature = (
             err.signature_dict() if isinstance(err, InvalidPayloadError) else None
         )
         delay = max(self._failure_backoff, MIN_SESSION_HISTORY_CACHE_TTL)
         if isinstance(err, BaseException):
             delay = max(delay, retry_after_delay(err) or 0.0)
-        self._service_backoff_until = time.monotonic() + delay
+        deadline = time.monotonic() + delay
+        if (
+            self._service_backoff_until is not None
+            and self._service_backoff_until >= deadline
+        ):
+            return
+        self._service_backoff_until = deadline
         try:
             self._service_backoff_ends_utc = dt_util.utcnow() + timedelta(seconds=delay)
         except Exception:
@@ -380,31 +422,40 @@ class SessionHistoryManager:
         max_cache_age: float | None = None,
     ) -> None:
         """Launch a background enrichment task for the provided serials."""
-        candidates = [sn for sn in dict.fromkeys(serials) if sn]
-        pending = [sn for sn in candidates if sn not in self._refresh_in_progress]
+        if not self._runtime_active():
+            return
+        day_key = self._as_local_history_day(day_local).strftime("%Y-%m-%d")
+        pending = {}
+        for sn in dict.fromkeys(serials):
+            if sn:
+                scope = self._session_read_scope(sn)
+                if day_key not in scope.scheduled_days:
+                    scope.scheduled_days.add(day_key)
+                    pending[sn] = scope
         if not pending:
             return
-        self._refresh_in_progress.update(pending)
 
         async def _run() -> None:
-            try:
-                updates = await self._async_enrich_sessions(
-                    pending,
-                    day_local=day_local,
-                    max_cache_age=max_cache_age,
-                )
-                if updates:
-                    self._apply_updates(updates)
-            finally:
-                for sn in pending:
-                    self._refresh_in_progress.discard(sn)
+            updates = await self._async_enrich_sessions(
+                (sn for sn, scope in pending.items() if not scope.retired),
+                day_local=day_local,
+                max_cache_age=max_cache_age,
+            )
+            if updates:
+                self._apply_updates(updates, day_local)
+
+        def _finished(task: asyncio.Task[None]) -> None:
+            self._enrichment_tasks.discard(task)
+            for sn, scope in pending.items():
+                scope.scheduled_days.discard(day_key)
+                self._discard_unused_read_scope(sn, scope)
 
         task = self._hass.async_create_task(
             _run(),
             name="enphase_ev_session_enrichment",
         )
         self._enrichment_tasks.add(task)
-        task.add_done_callback(self._enrichment_tasks.discard)
+        task.add_done_callback(_finished)
 
     async def async_enrich(
         self,
@@ -421,7 +472,7 @@ class SessionHistoryManager:
             max_cache_age=max_cache_age,
         )
         if in_background and updates:
-            self._apply_updates(updates)
+            self._apply_updates(updates, day_local)
         return updates
 
     async def _async_enrich_sessions(
@@ -446,12 +497,30 @@ class SessionHistoryManager:
         max_cache_age: float | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
         serial_list = [sn for sn in dict.fromkeys(serials) if sn]
-        if not serial_list:
+        if not serial_list or not self._runtime_active():
             return {}
+        with ExitStack() as stack:
+            scopes = {
+                sn: stack.enter_context(self._track_session_read(sn))
+                for sn in serial_list
+            }
+            return await self._async_run_enrichment(
+                scopes, day_local=day_local, max_cache_age=max_cache_age
+            )
+
+    async def _async_run_enrichment(
+        self,
+        scopes: dict[str, _SerialReadScope],
+        *,
+        day_local: datetime,
+        max_cache_age: float | None,
+    ) -> dict[str, list[dict[str, Any]]]:
         semaphore = asyncio.Semaphore(self._concurrency)
 
         async def _refresh(sn: str) -> tuple[str, list[dict[str, Any]] | None]:
             async with semaphore:
+                if not self._scope_current(scopes[sn]):
+                    return sn, None
                 try:
                     if max_cache_age is None:
                         sessions = await self._async_fetch_sessions_today(
@@ -492,7 +561,7 @@ class SessionHistoryManager:
                 _refresh(sn),
                 name=f"enphase_ev_session_refresh_{redact_identifier(sn)}",
             )
-            for sn in serial_list
+            for sn in scopes
         ]
         responses = await asyncio.gather(*tasks, return_exceptions=True)
         updates: dict[str, list[dict[str, Any]]] = {}
@@ -504,21 +573,37 @@ class SessionHistoryManager:
                 )
                 continue
             sn, sessions = response
-            if sessions is None:
+            if sessions is None or not self._scope_current(scopes[sn]):
                 continue
             updates[sn] = sessions
         return updates
 
-    def _apply_updates(self, updates: dict[str, list[dict[str, Any]]]) -> None:
+    def _apply_updates(
+        self, updates: dict[str, list[dict[str, Any]]], day_local: datetime
+    ) -> None:
         """Merge enrichment results into the published coordinator data."""
-        if not updates or not self._publish_callback or not self._data_supplier:
+        if (
+            not updates
+            or not self._publish_callback
+            or not self._data_supplier
+            or not self._runtime_active()
+        ):
             return
         current = self._data_supplier()
         if not isinstance(current, dict):
             return
         merged: dict[str, dict[str, Any]] | None = None
+        select_day = self._publication_day
+        if select_day is not None:
+            requested_day = self._as_local_history_day(day_local).date()
+            current_day = self._as_local_history_day(dt_util.now())
         for sn, sessions in updates.items():
             existing = current.get(sn)
+            if select_day is not None and (
+                not isinstance(existing, dict)
+                or select_day(existing, current_day).date() != requested_day
+            ):
+                continue
             entry = dict(existing) if isinstance(existing, dict) else {}
             sessions_kwh = self._sum_session_energy(sessions)
             if (
@@ -534,11 +619,46 @@ class SessionHistoryManager:
         if merged is not None:
             self._publish_callback(merged)
 
+    def _session_read_scope(self, sn: str) -> _SerialReadScope:
+        scope = self._serial_read_scopes.get(sn)
+        if scope is None:
+            scope = self._serial_read_scopes[sn] = _SerialReadScope(self._runtime_epoch)
+        return scope
+
+    def _discard_unused_read_scope(self, sn: str, scope: _SerialReadScope) -> None:
+        if (
+            not scope.scheduled_days
+            and not scope.readers
+            and self._serial_read_scopes.get(sn) is scope
+        ):
+            del self._serial_read_scopes[sn]
+
+    @contextmanager
+    def _track_session_read(self, sn: str) -> Iterator[_SerialReadScope]:
+        scope = self._session_read_scope(sn)
+        scope.readers += 1
+        try:
+            yield scope
+        finally:
+            scope.readers -= 1
+            self._discard_unused_read_scope(sn, scope)
+
+    def _sessions_during_backoff(
+        self, sn: str, day_key: str, cached: SessionCacheEntry | None
+    ) -> list[dict[str, Any]]:
+        if cached is None or not cached.has_valid_cache:
+            return []
+        self._service_using_stale = True
+        if cached.state != SESSION_CACHE_STATE_STALE_REUSED:
+            self._set_stale_reused_entry(sn, day_key, cached, self._service_last_error)
+        return cached.sessions
+
     async def _async_refresh_filter_criteria(
         self,
         criteria_fetcher: Callable[..., Awaitable[dict[str, Any]]],
+        scope: _SerialReadScope,
     ) -> None:
-        """Fetch site-scoped filter criteria once per cache window."""
+        """Fetch site-scoped criteria once per cache window under its lock."""
 
         checked_mono = self._criteria_checked_mono
         if (
@@ -547,15 +667,55 @@ class SessionHistoryManager:
         ):
             return
 
-        async with self._criteria_lock:
-            checked_mono = self._criteria_checked_mono
-            if (
-                checked_mono is not None
-                and (time.monotonic() - checked_mono) < self._cache_ttl
-            ):
-                return
+        with self._guard_session_transport(scope):
             await criteria_fetcher(request_id=str(uuid.uuid4()))
-            self._criteria_checked_mono = time.monotonic()
+        self._criteria_checked_mono = time.monotonic()
+
+    def _scope_runtime_current(self, scope: _SerialReadScope) -> bool:
+        return scope.epoch is self._runtime_epoch and self._runtime_active()
+
+    def _scope_current(self, scope: _SerialReadScope) -> bool:
+        return not scope.retired and self._scope_runtime_current(scope)
+
+    @contextmanager
+    def _guard_session_read(self, scope: _SerialReadScope) -> Iterator[None]:
+        """Discard results and failures from an invalidated acquisition."""
+        if not self._scope_current(scope):
+            raise asyncio.CancelledError
+        try:
+            yield
+        finally:
+            if not self._scope_current(scope):
+                raise asyncio.CancelledError
+
+    @contextmanager
+    def _guard_session_transport(self, scope: _SerialReadScope) -> Iterator[None]:
+        """Check queued dispatch and still honor a sent read's site-wide 429."""
+        with (
+            self._guard_session_read(scope),
+            guarded_read_scope(
+                lambda: self._scope_current(scope),
+                can_dispatch=lambda: not self._service_backoff_active(),
+                on_retired_rate_limit=lambda err: self._note_retired_rate_limit(
+                    scope, err
+                ),
+            ),
+        ):
+            try:
+                yield
+            except EnlightenReadSuperseded:
+                if self._scope_current(scope) and self._service_backoff_active():
+                    raise _HistoryReadDeferred from None
+                raise asyncio.CancelledError from None
+            except aiohttp.ClientResponseError as err:
+                self._note_retired_rate_limit(scope, err)
+                raise
+
+    def _note_retired_rate_limit(
+        self, scope: _SerialReadScope, err: aiohttp.ClientResponseError
+    ) -> None:
+        if err.status == 429 and scope.retired and self._scope_runtime_current(scope):
+            self._note_service_unavailable(err)
 
     async def _async_fetch_sessions_today(
         self,
@@ -565,27 +725,41 @@ class SessionHistoryManager:
         max_cache_age: float | None = None,
     ) -> list[dict[str, Any]]:
         """Return session history for the provided day, caching results."""
-        if self._fetch_override is not None:
-            return await self._fetch_override(sn, day_local=day_local)
-        if not sn:
+        if not sn and self._fetch_override is None:
             return []
-        if day_local is None:
-            day_local = dt_util.now()
+        with self._track_session_read(sn) as scope, self._guard_session_read(scope):
+            if self._fetch_override is not None:
+                return await self._fetch_override(sn, day_local=day_local)
+            return await self._async_fetch_scoped_sessions(
+                sn, day_local, max_cache_age, scope
+            )
+
+    @staticmethod
+    def _as_local_history_day(day_local: datetime) -> datetime:
         try:
-            local_dt = dt_util.as_local(day_local)
+            return cast(datetime, dt_util.as_local(day_local))
         except Exception:
             if day_local.tzinfo is None:
                 day_local = day_local.replace(tzinfo=dt_util.UTC)
-            local_dt = dt_util.as_local(day_local)
+            return cast(datetime, dt_util.as_local(day_local))
+
+    async def _async_fetch_scoped_sessions(
+        self,
+        sn: str,
+        day_local: datetime | None,
+        max_cache_age: float | None,
+        scope: _SerialReadScope,
+    ) -> list[dict[str, Any]]:
+        if day_local is None:
+            day_local = dt_util.now()
+        local_dt = self._as_local_history_day(day_local)
 
         day_key = local_dt.strftime("%Y-%m-%d")
         cache_key = (sn, day_key)
-        now_mono = time.monotonic()
         active_serials = self._active_serials_from_data_supplier()
         if active_serials is not None:
             active_serials.add(sn)
-        self.prune(active_serials=active_serials, keep_day_keys={day_key})
-        cached = self._get_cache_entry(cache_key)
+        self._prune_cached_entries(active_serials, {day_key})
         refresh_after = self._cache_ttl
         if max_cache_age is not None:
             try:
@@ -595,19 +769,55 @@ class SessionHistoryManager:
                 )
             except (TypeError, ValueError):
                 refresh_after = self._cache_ttl
-        if (
-            cached is not None
-            and cached.has_valid_cache
-            and cached.cached_at_mono is not None
-            and (now_mono - cached.cached_at_mono) < refresh_after
-        ):
-            return cached.sessions
-        if self._service_backoff_active():
-            return cached.sessions if cached and cached.has_valid_cache else []
-        block_until = self._block_until.get(sn)
-        if block_until and now_mono < block_until:
-            return cached.sessions if cached and cached.has_valid_cache else []
+        while True:
+            now_mono = time.monotonic()
+            cached = self._get_cache_entry(cache_key)
+            if (
+                cached is not None
+                and cached.has_valid_cache
+                and cached.cached_at_mono is not None
+                and (now_mono - cached.cached_at_mono) < refresh_after
+            ):
+                return cached.sessions
+            if self._service_backoff_active():
+                return self._sessions_during_backoff(sn, day_key, cached)
+            block_until = self._block_until.get(sn)
+            if block_until and now_mono < block_until:
+                return cached.sessions if cached and cached.has_valid_cache else []
 
+            pending = self._session_reads.get(cache_key)
+            if pending is None:
+                break
+            with self._guard_session_read(scope):
+                shared = await asyncio.shield(pending)
+            if shared is not None:
+                return list(shared)
+
+        read: _SessionRead = asyncio.get_running_loop().create_future()
+        self._session_reads[cache_key] = read
+        result = None
+        try:
+            with self._guard_session_read(scope):
+                result = await self._async_acquire_sessions(
+                    sn, local_dt, day_key, cached, scope
+                )
+            return result
+        finally:
+            if self._session_reads.get(cache_key) is read:
+                del self._session_reads[cache_key]
+            if not read.done():
+                # A cancelled owner lets its waiters elect a new owner.
+                read.set_result(result)
+
+    async def _async_acquire_sessions(
+        self,
+        sn: str,
+        local_dt: datetime,
+        day_key: str,
+        cached: SessionCacheEntry | None,
+        scope: _SerialReadScope,
+    ) -> list[dict[str, Any]]:
+        now_mono = time.monotonic()
         api_day = local_dt.strftime("%d-%m-%Y")
         client = self._client_getter()
         if client is None:
@@ -617,61 +827,66 @@ class SessionHistoryManager:
 
         criteria_fetcher = getattr(client, "session_history_filter_criteria", None)
         if callable(criteria_fetcher):
-            try:
-                await self._async_refresh_filter_criteria(criteria_fetcher)
-            except SessionHistoryUnavailable as err:
-                self._logger.debug(
-                    "Session history criteria unavailable for %s: %s",
-                    sn,
-                    self._redact_error(err),
-                )
-                if cached and cached.has_valid_cache:
-                    self._note_service_unavailable(err, using_stale=True)
-                    self._set_stale_reused_entry(sn, day_key, cached, err)
-                    return cached.sessions
-                self._note_service_unavailable(err)
-                self._set_unavailable_entry(sn, day_key, now_mono, err)
-                return []
-            except Unauthorized as err:
-                self._logger.debug(
-                    "Session history criteria unauthorized for %s: %s",
-                    sn,
-                    self._redact_error(err),
-                )
-                self._set_unavailable_entry(sn, day_key, now_mono, err)
-                return []
-            except aiohttp.ClientResponseError as err:
-                self._logger.debug(
-                    "Session history criteria error for %s: %s (%s)",
-                    sn,
-                    err.status,
-                    self._redact_error(err.message),
-                )
-                if err.status == 429:
-                    self._note_service_unavailable(
-                        err, using_stale=bool(cached and cached.has_valid_cache)
+            async with self._criteria_lock:
+                if not self._scope_current(scope):
+                    raise asyncio.CancelledError
+                if self._service_backoff_active():
+                    return self._sessions_during_backoff(sn, day_key, cached)
+                try:
+                    await self._async_refresh_filter_criteria(criteria_fetcher, scope)
+                except _HistoryReadDeferred:
+                    return self._sessions_during_backoff(sn, day_key, cached)
+                except SessionHistoryUnavailable as err:
+                    self._logger.debug(
+                        "Session history criteria unavailable for %s: %s",
+                        sn,
+                        self._redact_error(err),
                     )
                     if cached and cached.has_valid_cache:
+                        self._note_service_unavailable(err, using_stale=True)
                         self._set_stale_reused_entry(sn, day_key, cached, err)
                         return cached.sessions
-                if err.status in (500, 502, 503, 504, 550):
-                    self._block_until[sn] = now_mono + self._failure_backoff
-                self._set_unavailable_entry(sn, day_key, now_mono, err)
-                return []
-            except Exception as err:  # noqa: BLE001
-                self._logger.debug(
-                    "Session history criteria failed for %s: %s",
-                    sn,
-                    self._redact_error(err),
-                )
-                if cached and cached.has_valid_cache:
-                    self._note_service_unavailable(err, using_stale=True)
-                    self._set_stale_reused_entry(sn, day_key, cached, err)
-                    return cached.sessions
-                self._set_unavailable_entry(sn, day_key, now_mono, err)
-                return []
-
-        pages = SessionHistoryPages()
+                    self._note_service_unavailable(err)
+                    self._set_unavailable_entry(sn, day_key, now_mono, err)
+                    return []
+                except Unauthorized as err:
+                    self._logger.debug(
+                        "Session history criteria unauthorized for %s: %s",
+                        sn,
+                        self._redact_error(err),
+                    )
+                    self._set_unavailable_entry(sn, day_key, now_mono, err)
+                    return []
+                except aiohttp.ClientResponseError as err:
+                    self._logger.debug(
+                        "Session history criteria error for %s: %s (%s)",
+                        sn,
+                        err.status,
+                        self._redact_error(err.message),
+                    )
+                    if err.status == 429:
+                        self._note_service_unavailable(
+                            err, using_stale=bool(cached and cached.has_valid_cache)
+                        )
+                        if cached and cached.has_valid_cache:
+                            self._set_stale_reused_entry(sn, day_key, cached, err)
+                            return cached.sessions
+                    if err.status in (500, 502, 503, 504, 550):
+                        self._block_until[sn] = now_mono + self._failure_backoff
+                    self._set_unavailable_entry(sn, day_key, now_mono, err)
+                    return []
+                except Exception as err:  # noqa: BLE001
+                    self._logger.debug(
+                        "Session history criteria failed for %s: %s",
+                        sn,
+                        self._redact_error(err),
+                    )
+                    if cached and cached.has_valid_cache:
+                        self._note_service_unavailable(err, using_stale=True)
+                        self._set_stale_reused_entry(sn, day_key, cached, err)
+                        return cached.sessions
+                    self._set_unavailable_entry(sn, day_key, now_mono, err)
+                    return []
 
         async def _fetch_page(offset: int, limit: int) -> object:
             return await client.session_history(
@@ -684,15 +899,8 @@ class SessionHistoryManager:
                 request_id=str(uuid.uuid4()),
             )
 
-        offset = 0
-        limit = 50
         try:
-            for _ in range(5):
-                payload = await _fetch_page(offset, limit)
-                if not pages.add(payload):
-                    break
-                offset += limit
-            results = pages.finish()
+            results = await self._async_read_session_pages(_fetch_page, scope)
         except SessionHistoryUnavailable as err:
             self._logger.debug(
                 "Session history unavailable for %s on %s: %s",
@@ -750,11 +958,11 @@ class SessionHistoryManager:
                 self._note_service_unavailable(err)
             self._set_unavailable_entry(sn, day_key, now_mono, err)
             return []
-        finally:
-            self._pagination_diagnostics = pages.diagnostics()
-
+        if results is None:
+            return self._sessions_during_backoff(sn, day_key, cached)
         sessions = self._normalise_sessions_for_day(local_dt=local_dt, results=results)
-        self._mark_service_available()
+        if not self._service_backoff_active():
+            self._mark_service_available()
         self._block_until.pop(sn, None)
         self._set_cache_entry(
             sn,
@@ -768,6 +976,31 @@ class SessionHistoryManager:
             ),
         )
         return sessions
+
+    async def _async_read_session_pages(
+        self,
+        fetch_page: Callable[[int, int], Awaitable[object]],
+        scope: _SerialReadScope,
+    ) -> list[dict[str, Any]] | None:
+        """Fetch a complete page sequence unless a shared cooldown starts."""
+        pages = SessionHistoryPages()
+        offset = 0
+        limit = 50
+        try:
+            for _ in range(5):
+                if self._service_backoff_active():
+                    return None
+                with self._guard_session_transport(scope):
+                    payload = await fetch_page(offset, limit)
+                if not pages.add(payload):
+                    break
+                offset += limit
+            return pages.finish()
+        except _HistoryReadDeferred:
+            return None
+        finally:
+            if self._scope_current(scope):
+                self._pagination_diagnostics = pages.diagnostics()
 
     @staticmethod
     def _normalize_serials(serials: Iterable[str] | None) -> set[str] | None:
@@ -820,7 +1053,7 @@ class SessionHistoryManager:
         active_serials = self._active_serials_from_data_supplier()
         if active_serials is not None:
             active_serials.add(serial)
-        self.prune(active_serials=active_serials, keep_day_keys={day_key})
+        self._prune_cached_entries(active_serials, {day_key})
 
     def prune(
         self,
@@ -830,6 +1063,22 @@ class SessionHistoryManager:
     ) -> None:
         """Prune stale serial/day cache entries and serial-scoped state."""
         active_set = self._normalize_serials(active_serials)
+        self._prune_cached_entries(active_set, keep_day_keys)
+        if active_set is not None:
+            self._retire_session_reads(active_set)
+
+    def _retire_session_reads(self, active_serials: set[str]) -> None:
+        for sn in self._serial_read_scopes.keys() - active_serials:
+            self._serial_read_scopes.pop(sn).retired = True
+        for key in tuple(self._session_reads):
+            if key[0] not in active_serials:
+                self._session_reads.pop(key).cancel()
+
+    def _prune_cached_entries(
+        self,
+        active_set: set[str] | None,
+        keep_day_keys: Iterable[str] | None,
+    ) -> None:
         retained_days = self._retained_day_keys(keep_day_keys)
 
         if self._cache:
@@ -844,18 +1093,16 @@ class SessionHistoryManager:
             if until <= now_mono or (active_set is not None and sn not in active_set):
                 self._block_until.pop(sn, None)
 
-        if active_set is not None:
-            self._refresh_in_progress.intersection_update(active_set)
-
     def clear(self) -> None:
         """Drop cached state and cancel in-flight background enrichment tasks."""
+        self._runtime_epoch = object()
+        self._retire_session_reads(set())
         for task in list(self._enrichment_tasks):
             task.cancel()
         self._enrichment_tasks.clear()
         self._cache.clear()
         self._block_until.clear()
         self._criteria_checked_mono = None
-        self._refresh_in_progress.clear()
 
     def set_fetch_override(
         self,

@@ -949,14 +949,19 @@ async def test_session_history_filter_criteria_short_circuits_when_recent(
 
     manager = SessionHistoryManager(
         hass,
-        lambda: None,
+        lambda: SimpleNamespace(
+            session_history_filter_criteria=_criteria_fetcher,
+            session_history=AsyncMock(
+                return_value={"data": {"result": [], "hasMore": False}}
+            ),
+        ),
         cache_ttl=600,
         data_supplier=lambda: {},
         publish_callback=lambda _: None,
     )
     manager._criteria_checked_mono = time.monotonic()
 
-    await manager._async_refresh_filter_criteria(_criteria_fetcher)  # noqa: SLF001
+    await manager._async_fetch_sessions_today("EV-01")  # noqa: SLF001
 
     assert called is False
 
@@ -964,7 +969,7 @@ async def test_session_history_filter_criteria_short_circuits_when_recent(
 def test_session_history_apply_updates_merges_data(hass) -> None:
     """Applying updates should merge sessions and compute totals."""
     published: list[dict] = []
-    base = {"EV-01": {"sn": "EV-01"}}
+    base = {"EV-01": {"sn": "EV-01"}, "EV-02": {"sn": "EV-02"}}
     manager = SessionHistoryManager(
         hass,
         lambda: None,
@@ -973,10 +978,14 @@ def test_session_history_apply_updates_merges_data(hass) -> None:
         publish_callback=lambda data: published.append(data),
     )
 
-    manager._apply_updates({"EV-01": [{"energy_kwh": 1.5}]})
-    assert published
-    merged = published[-1]
+    manager._apply_updates(
+        {"EV-01": [{"energy_kwh": 1.5}], "EV-02": [{"energy_kwh": 2.5}]},
+        datetime.now(timezone.utc),
+    )
+
+    (merged,) = published
     assert merged["EV-01"]["energy_today_sessions_kwh"] == 1.5
+    assert merged["EV-02"]["energy_today_sessions_kwh"] == 2.5
 
 
 def test_session_history_apply_updates_reuses_untouched_payloads(hass) -> None:
@@ -992,7 +1001,7 @@ def test_session_history_apply_updates_reuses_untouched_payloads(hass) -> None:
         publish_callback=lambda data: published.append(data),
     )
 
-    manager._apply_updates({"EV-01": [{"energy_kwh": 1.5}]})
+    manager._apply_updates({"EV-01": [{"energy_kwh": 1.5}]}, datetime.now(timezone.utc))
 
     merged = published[-1]
     assert merged["EV-01"] is not base["EV-01"]
@@ -1323,8 +1332,8 @@ def test_session_history_apply_updates_noop_without_inputs(hass) -> None:
         data_supplier=None,
         publish_callback=None,
     )
-    manager._apply_updates(None)
-    manager._apply_updates({})
+    manager._apply_updates(None, datetime.now(timezone.utc))
+    manager._apply_updates({}, datetime.now(timezone.utc))
 
 
 @pytest.mark.asyncio
@@ -1407,7 +1416,8 @@ def test_session_history_prune_bounds_cache_and_serial_state(hass) -> None:
         "EV-OLD": time.monotonic() + 60,
     }
     manager._criteria_checked_mono = 1.0
-    manager._refresh_in_progress = {"EV-01", "EV-OLD"}
+    for sn in ("EV-01", "EV-OLD"):
+        manager._session_read_scope(sn).scheduled_days.add("2020-01-02")
 
     manager.prune(active_serials={"EV-01"}, keep_day_keys={"2020-01-02"})
 
@@ -1415,7 +1425,8 @@ def test_session_history_prune_bounds_cache_and_serial_state(hass) -> None:
     assert "EV-OLD" not in manager._block_until
     assert "EV-01" not in manager._block_until
     assert manager._criteria_checked_mono == 1.0
-    assert manager._refresh_in_progress == {"EV-01"}
+    assert set(manager._serial_read_scopes) == {"EV-01"}
+    assert manager.in_progress == 1
 
 
 @pytest.mark.asyncio
@@ -1430,7 +1441,7 @@ async def test_session_history_clear_cancels_tasks_and_clears_state(hass) -> Non
     manager._cache[("EV-01", "2020-01-02")] = (time.monotonic(), [])
     manager._block_until["EV-01"] = time.monotonic() + 60
     manager._criteria_checked_mono = time.monotonic()
-    manager._refresh_in_progress.add("EV-01")
+    manager._session_read_scope("EV-01").scheduled_days.add("2020-01-02")
     task = asyncio.create_task(asyncio.sleep(30))
     manager._enrichment_tasks.add(task)
 
@@ -1441,7 +1452,8 @@ async def test_session_history_clear_cancels_tasks_and_clears_state(hass) -> Non
     assert manager._cache == {}
     assert manager._block_until == {}
     assert manager._criteria_checked_mono is None
-    assert manager._refresh_in_progress == set()
+    assert not manager._serial_read_scopes
+    assert manager.in_progress == 0
     assert manager._enrichment_tasks == set()
 
 

@@ -3566,8 +3566,14 @@ Inference:
 
 Implementation note:
 - The integration exposes this feed through the site-level `System Event History`
-  calendar on the Enphase Cloud device. Calendar range requests paginate from the
-  newest row until the requested start date or a 2,000-row safety bound is reached.
+  calendar on the Enphase Cloud device. Calendar range requests follow cursors
+  until the feed ends or reaches a safety bound of 2,000 rows or 100 pages.
+  A later page can contain an event that began earlier and overlaps the requested
+  range. A fresh complete range serves contained requests in the same locale.
+  A different range with missing or incomplete coverage starts a fresh
+  provider scan. Concurrent same-locale queries can share a scan they are
+  already waiting for. Capped scans remain incomplete. After a later-page
+  failure, validated matches may serve only the exact range during cooldown.
   Raw IDs, serials, impacted-device lists, message parameters, CSV links, and
   continuation cursors are discarded after descriptions and recommended actions
   are sanitized. The separate System Dashboard table below remains authoritative

@@ -2483,3 +2483,244 @@ async def test_async_fetch_hems_devices_passes_refresh_flag(monkeypatch) -> None
     )
 
     fetch_mock.assert_awaited_once_with(refresh_data=True)
+
+
+@pytest.mark.parametrize("phase", ["criteria", "page"])
+@pytest.mark.parametrize("transition", ["cooldown", "prune", "unload", "active"])
+async def test_history_checks_cooldown_and_retirement_at_transport_admission(
+    coordinator_factory, monkeypatch, loopback_sockets, phase, transition
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import dashboard_surface
+
+    coord = coordinator_factory()
+    manager = coord.session_history
+    day = dt_util.now()
+    if phase == "page":
+        manager._criteria_checked_mono = time.monotonic()
+    queued = asyncio.Event()
+
+    class ObservableLimiter(asyncio.Semaphore):
+        async def acquire(self):
+            if self.locked():
+                queued.set()
+            return await super().acquire()
+
+    limiter = ObservableLimiter(1)
+    await limiter.acquire()
+    monkeypatch.setattr(
+        api_common, "_get_enlighten_optional_read_semaphore", lambda: limiter
+    )
+    monkeypatch.setattr(
+        api_common, "_should_limit_enlighten_read_request", lambda *_args: True
+    )
+    dispatched = []
+
+    async def respond(request):
+        dispatched.append(request.method)
+        return web.json_response({"data": {"result": [], "hasMore": False}})
+
+    app = web.Application()
+    app.router.add_route("*", "/{path:.*}", respond)
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        monkeypatch.setattr(
+            dashboard_surface, "BASE_URL", str(server.make_url("/")).rstrip("/")
+        )
+        monkeypatch.setattr(coord.client, "_s", session)
+        async with asyncio.timeout(3):
+            reader = asyncio.create_task(
+                manager.async_enrich(["EV-A"], day, in_background=False)
+            )
+            await queued.wait()
+            if transition == "cooldown":
+                manager._note_service_unavailable(_make_cre(429))
+            elif transition == "prune":
+                manager.prune(active_serials=[])
+            elif transition == "unload":
+                coord.mark_runtime_stopped()
+                manager.schedule_enrichment(["EV-B"], day)
+                assert not manager._enrichment_tasks
+                assert (
+                    await manager.async_enrich(["EV-B"], day, in_background=False) == {}
+                )
+                with pytest.raises(asyncio.CancelledError):
+                    await manager._async_fetch_sessions_today("EV-B", day_local=day)
+            limiter.release()
+            result = await reader
+
+    if transition == "active":
+        assert dispatched == (["GET", "POST"] if phase == "criteria" else ["POST"])
+        assert result == {"EV-A": []}
+    else:
+        assert not dispatched
+        assert result == ({"EV-A": []} if transition == "cooldown" else {})
+    assert manager.service_failures == (transition == "cooldown")
+    assert not manager._serial_read_scopes
+
+
+async def test_retired_criteria_response_retains_provider_cooldown_for_other_charger(
+    coordinator_factory, monkeypatch, loopback_sockets
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import dashboard_surface
+
+    coord = coordinator_factory()
+    manager = coord.session_history
+    day = dt_util.now()
+    entered, release = asyncio.Event(), asyncio.Event()
+    dispatched = []
+
+    async def respond(request):
+        dispatched.append(request.method)
+        entered.set()
+        await release.wait()
+        return web.Response(status=429, headers={"Retry-After": "1800"})
+
+    app = web.Application()
+    app.router.add_route("*", "/{path:.*}", respond)
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        monkeypatch.setattr(
+            dashboard_surface, "BASE_URL", str(server.make_url("/")).rstrip("/")
+        )
+        monkeypatch.setattr(coord.client, "_s", session)
+        async with asyncio.timeout(3):
+            batch = asyncio.create_task(
+                manager.async_enrich(["EV-A", "EV-B"], day, in_background=False)
+            )
+            await entered.wait()
+            manager.prune(active_serials=["EV-B"])
+            release.set()
+            assert await batch == {"EV-B": []}
+
+    assert dispatched == ["GET"]
+    assert manager.service_failures == 1
+    assert manager._service_backoff_until - time.monotonic() == pytest.approx(
+        1800, abs=3
+    )
+    assert manager.cache_key_count == 0
+
+
+@pytest.mark.parametrize("status", [200, 401, 429])
+async def test_retired_history_response_cannot_apply_cookies_or_reauthenticate(
+    coordinator_factory, monkeypatch, loopback_sockets, status
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import dashboard_surface
+
+    coord = coordinator_factory()
+    manager = coord.session_history
+    manager._criteria_checked_mono = time.monotonic()
+    reauth = AsyncMock(return_value=False)
+    coord.client.set_reauth_callback(reauth)
+    entered, release = asyncio.Event(), asyncio.Event()
+    calls = []
+
+    async def respond(request):
+        calls.append(request.method)
+        entered.set()
+        await release.wait()
+        if status == 200:
+            response = web.json_response({"data": {"result": [], "hasMore": False}})
+        else:
+            response = web.Response(
+                status=status,
+                text="Session history unavailable",
+                headers={"Retry-After": "1800"} if status == 429 else {},
+            )
+        response.set_cookie("retired_history_fixture", "opaque")
+        return response
+
+    app = web.Application()
+    app.router.add_post("/{path:.*}", respond)
+    async with (
+        TestServer(app) as server,
+        aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(unsafe=True)) as session,
+    ):
+        monkeypatch.setattr(
+            dashboard_surface, "BASE_URL", str(server.make_url("/")).rstrip("/")
+        )
+        monkeypatch.setattr(coord.client, "_s", session)
+        async with asyncio.timeout(5):
+            acquisition = asyncio.create_task(
+                manager.async_enrich(["EV-A"], dt_util.now(), in_background=False)
+            )
+            await entered.wait()
+            manager.prune(active_serials=["EV-B"])
+            release.set()
+            assert await acquisition == {}
+
+        assert "retired_history_fixture" not in session.cookie_jar.filter_cookies(
+            server.make_url("/")
+        )
+
+    assert calls == ["POST"]
+    reauth.assert_not_awaited()
+    assert not manager.cache_key_count
+    assert manager.service_failures == (status == 429)
+    if status == 429:
+        assert manager.service_last_error == "Session history rate limited"
+        assert manager._service_backoff_until - time.monotonic() == pytest.approx(
+            1800, abs=3
+        )
+
+
+async def test_history_429_headers_defer_queued_read_without_waiting_for_body(
+    coordinator_factory, monkeypatch, loopback_sockets
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import dashboard_surface
+
+    coord = coordinator_factory()
+    manager = coord.session_history
+    manager._criteria_checked_mono = time.monotonic()
+    limiter = asyncio.Semaphore(1)
+    monkeypatch.setattr(
+        api_common, "_get_enlighten_optional_read_semaphore", lambda: limiter
+    )
+    monkeypatch.setattr(
+        api_common, "_should_limit_enlighten_read_request", lambda *_args: True
+    )
+    headers_sent, finish_body = asyncio.Event(), asyncio.Event()
+    dispatched = []
+
+    async def respond(request):
+        dispatched.append(request.path)
+        response = web.StreamResponse(status=429, headers={"Retry-After": "1800"})
+        await response.prepare(request)
+        headers_sent.set()
+        await finish_body.wait()
+        return response
+
+    app = web.Application()
+    app.router.add_post("/{path:.*}", respond)
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        monkeypatch.setattr(
+            dashboard_surface, "BASE_URL", str(server.make_url("/")).rstrip("/")
+        )
+        monkeypatch.setattr(coord.client, "_s", session)
+        async with asyncio.timeout(5):
+            batch = asyncio.create_task(
+                manager.async_enrich(
+                    ["EV-A", "EV-B"], dt_util.now(), in_background=False
+                )
+            )
+            try:
+                await headers_sent.wait()
+                assert await batch == {"EV-A": [], "EV-B": []}
+                assert not finish_body.is_set()
+            finally:
+                finish_body.set()
+
+    assert len(dispatched) == 1
+    assert manager.service_failures == 1
+    assert manager._service_backoff_until - time.monotonic() == pytest.approx(
+        1800, abs=3
+    )

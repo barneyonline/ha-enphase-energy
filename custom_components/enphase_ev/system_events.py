@@ -8,21 +8,27 @@ import logging
 import re
 import time
 from collections import Counter, OrderedDict
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Iterable, Iterator, Mapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from itertools import islice
 from typing import TYPE_CHECKING
 
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 
-from .api import EnphaseLoginWallUnauthorized, OptionalEndpointUnavailable
+from .api import (
+    EnphaseLoginWallUnauthorized,
+    OptionalEndpointUnavailable,
+    runtime_read_scope,
+)
 from .const import (
     DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
     DOMAIN,
     OPT_SYSTEM_EVENT_REPAIR_ISSUES,
 )
-from .log_redaction import redact_text
+from .log_redaction import prepare_identifier_redaction, redact_text
 from .repair_issues import async_refresh_issue_set, entry_issue_kwargs
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -228,6 +234,9 @@ class SystemEventHistoryEntry:
     end: datetime
 
 
+_HistoryRangeKey = tuple[datetime, datetime, str]
+
+
 @dataclass(frozen=True, slots=True)
 class _HistoryRangeCacheEntry:
     """Short-lived sanitized result for one calendar range."""
@@ -235,6 +244,24 @@ class _HistoryRangeCacheEntry:
     expires_mono: float
     events: tuple[SystemEventHistoryEntry, ...]
     truncated: bool
+    failed_prefix: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _HistoryFeedSnapshot:
+    """One validated provider feed or capped prefix, shared by locale."""
+
+    locale: str
+    expires_mono: float
+    events: tuple[SystemEventHistoryEntry, ...]
+    truncated: bool
+
+
+@dataclass(eq=False, slots=True)
+class _HistoryQuery:
+    """An active calendar query and any feed acquired while it waited."""
+
+    feed: _HistoryFeedSnapshot | None = None
 
 
 def _history_epoch(value: object) -> datetime | None:
@@ -299,28 +326,37 @@ def _history_event_key_label(value: object) -> str | None:
     return " ".join(text.replace("_", " ").replace("-", " ").split()).capitalize()
 
 
-def parse_homeowner_event_history(
-    payload: object,
-    *,
-    site_id: str,
-) -> tuple[SystemEventHistoryEntry, ...] | None:
-    """Parse and sanitize one homeowner event-history payload."""
+@dataclass(frozen=True, slots=True)
+class _ParsedHistoryPage:
+    events: tuple[SystemEventHistoryEntry, ...]
+    complete: bool
 
+
+def _parse_history_page(payload: object, *, site_id: str) -> _ParsedHistoryPage | None:
     if not isinstance(payload, dict):
         return None
     rows = payload.get("events")
     if not isinstance(rows, list):
         return None
     events: dict[str, SystemEventHistoryEntry] = {}
+    complete = True
     for row in rows:
         if not isinstance(row, dict):
+            complete = False
             continue
-        start = _history_epoch(row.get("event_start_date")) or _history_epoch(
-            row.get("event_date")
-        )
+        raw_start = row.get("event_start_date")
+        start = _history_epoch(raw_start)
         if start is None:
+            if raw_start is not None:
+                complete = False
+            start = _history_epoch(row.get("event_date"))
+        if start is None:
+            complete = False
             continue
-        clear = _history_epoch(row.get("event_clear_date"))
+        raw_clear = row.get("event_clear_date")
+        clear = _history_epoch(raw_clear)
+        if raw_clear is not None and (clear is None or clear < start):
+            complete = False
         end = (
             clear
             if clear is not None and clear > start
@@ -362,7 +398,19 @@ def parse_homeowner_event_history(
                 end=end,
             ),
         )
-    return tuple(sorted(events.values(), key=lambda event: event.start))
+    if rows and not events:
+        return None
+    return _ParsedHistoryPage(
+        tuple(sorted(events.values(), key=lambda event: event.start)), complete
+    )
+
+
+def parse_homeowner_event_history(
+    payload: object, *, site_id: str
+) -> tuple[SystemEventHistoryEntry, ...] | None:
+    """Parse and sanitize one homeowner event-history payload."""
+    parsed = _parse_history_page(payload, site_id=site_id)
+    return parsed.events if parsed is not None else None
 
 
 def parse_active_system_events(
@@ -388,12 +436,12 @@ def parse_standing_alarms(
     rows = payload.get("alarms")
     if not isinstance(rows, list):
         return ()
-    serials = [
+    replace_identifiers = prepare_identifier_redaction(
         serial
         for row in rows
         if isinstance(row, dict)
         and (serial := _text(row.get("serial_num"))) is not None
-    ]
+    )
     alarms: list[StandingAlarm] = []
     seen: set[str] = set()
     for row in rows:
@@ -413,20 +461,20 @@ def parse_standing_alarms(
         severity_text = redact_text(
             _text(row.get("severity")) or "",
             site_ids=(site_id,),
-            identifiers=serials,
+            replace_identifiers=replace_identifiers,
             max_length=40,
         )
         severity = _normalized(severity_text) or "unknown"
         device_type = redact_text(
             _text(row.get("type")) or "unknown",
             site_ids=(site_id,),
-            identifiers=serials,
+            replace_identifiers=replace_identifiers,
             max_length=80,
         )
         first_set = redact_text(
             _text(row.get("first_set")) or "",
             site_ids=(site_id,),
-            identifiers=serials,
+            replace_identifiers=replace_identifiers,
             max_length=80,
         )
         alarms.append(
@@ -440,7 +488,7 @@ def parse_standing_alarms(
                         "[redacted]", _text(row.get("description")) or ""
                     ),
                     site_ids=(site_id,),
-                    identifiers=serials,
+                    replace_identifiers=replace_identifiers,
                     max_length=160,
                 )
                 or None,
@@ -464,12 +512,12 @@ def _parse_system_event_snapshot(
     states = _lookup_catalog(payload.get("event_states"))
     severities = _lookup_catalog(payload.get("event_severities"))
     event_types = _lookup_catalog(payload.get("event_types"))
-    serials = [
+    replace_identifiers = prepare_identifier_redaction(
         serial
         for row in rows
         if isinstance(row, dict)
         and (serial := _text(row.get("serial_number"))) is not None
-    ]
+    )
     events: list[SystemEvent] = []
     resolved: set[str] = set()
     seen: set[str] = set()
@@ -500,13 +548,13 @@ def _parse_system_event_snapshot(
         event_type = redact_text(
             event_type,
             site_ids=(site_id,),
-            identifiers=serials,
+            replace_identifiers=replace_identifiers,
             max_length=120,
         )
         device_type = redact_text(
             _text(row.get("device_type")) or "unknown",
             site_ids=(site_id,),
-            identifiers=serials,
+            replace_identifiers=replace_identifiers,
             max_length=80,
         )
         events.append(
@@ -522,7 +570,7 @@ def _parse_system_event_snapshot(
                 description=redact_text(
                     _PRIVATE_URL_RE.sub("[redacted]", _text(row.get("details")) or ""),
                     site_ids=(site_id,),
-                    identifiers=serials,
+                    replace_identifiers=replace_identifiers,
                     max_length=160,
                 )
                 or None,
@@ -547,9 +595,11 @@ class SystemEventsRuntime:
         self._history_last_success_utc: datetime | None = None
         self._history_probe_events: tuple[SystemEventHistoryEntry, ...] = ()
         self._history_range_cache: OrderedDict[
-            tuple[str, str, str], _HistoryRangeCacheEntry
+            _HistoryRangeKey, _HistoryRangeCacheEntry
         ] = OrderedDict()
+        self._history_feed: _HistoryFeedSnapshot | None = None
         self._history_lock = asyncio.Lock()
+        self._history_queries: dict[str, set[_HistoryQuery]] = {}
         self._history_using_cached_data = False
         self._history_truncated = False
 
@@ -599,8 +649,11 @@ class SystemEventsRuntime:
     def activity_events(self) -> tuple[dict[str, object], ...]:
         """Return complete sanitized rows with internal comparison fingerprints."""
 
-        summaries: list[dict[str, object]] = [
-            {
+        return tuple(self._iter_activity_events())
+
+    def _iter_activity_events(self) -> Iterator[dict[str, object]]:
+        for alarm in self._standing_alarms:
+            yield {
                 "fingerprint": alarm.fingerprint,
                 "type": "Standing Alarm",
                 "device_type": alarm.device_type,
@@ -610,30 +663,27 @@ class SystemEventsRuntime:
                 "severity": alarm.severity,
                 "description": alarm.description,
             }
-            for alarm in self._standing_alarms
-        ]
-        summaries.extend(
-            {
-                "fingerprint": event.fingerprint,
-                "type": event.event_type,
-                "device_type": event.device_type,
-                "state": event.state,
-                "event_date": event.event_date,
-                "updated_at": event.updated_at,
-                "severity": event.severity,
-                "description": event.description,
-            }
-            for event in self._events
-            if event.high_impact
-        )
-        return tuple(summaries)
+        for event in self._events:
+            if event.high_impact:
+                yield {
+                    "fingerprint": event.fingerprint,
+                    "type": event.event_type,
+                    "device_type": event.device_type,
+                    "state": event.state,
+                    "event_date": event.event_date,
+                    "updated_at": event.updated_at,
+                    "severity": event.severity,
+                    "description": event.description,
+                }
 
     @property
     def active_event_attributes(self) -> tuple[dict[str, object], ...]:
         """Expose bounded rows without their internal comparison fingerprints."""
         return tuple(
             {key: value for key, value in row.items() if key != "fingerprint"}
-            for row in self.activity_events[:ACTIVE_EVENTS_ATTRIBUTE_LIMIT]
+            for row in islice(
+                self._iter_activity_events(), ACTIVE_EVENTS_ATTRIBUTE_LIMIT
+            )
         )
 
     def refresh_due(self) -> bool:
@@ -662,80 +712,212 @@ class SystemEventsRuntime:
         start: datetime,
         end: datetime,
         locale: str,
-    ) -> tuple[str, str, str]:
-        return (
-            dt_util.as_utc(start).isoformat(),
-            dt_util.as_utc(end).isoformat(),
-            locale,
-        )
+    ) -> _HistoryRangeKey:
+        return dt_util.as_utc(start), dt_util.as_utc(end), locale
 
     def _history_cached_range(
         self,
-        key: tuple[str, str, str],
+        key: _HistoryRangeKey,
         *,
         allow_expired: bool = False,
     ) -> _HistoryRangeCacheEntry | None:
         entry = self._history_range_cache.get(key)
         if entry is None:
             return None
-        if not allow_expired and time.monotonic() >= entry.expires_mono:
+        expired = time.monotonic() >= entry.expires_mono
+        if (entry.failed_prefix and (expired or not allow_expired)) or (
+            expired and not allow_expired
+        ):
             return None
         self._history_range_cache.move_to_end(key)
         return entry
 
+    def _history_fallback(
+        self, key: _HistoryRangeKey, *, allow_failed_prefix: bool = False
+    ) -> _HistoryRangeCacheEntry | None:
+        entry = self._history_range_cache.get(key)
+        if entry is None:
+            return None
+        if entry.failed_prefix:
+            if not allow_failed_prefix:
+                return None
+        elif not self.coordinator._endpoint_family_can_use_stale(
+            SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
+        ):
+            return None
+        return self._history_cached_range(key, allow_expired=True)
+
+    def _fresh_history_feed(self, locale: str) -> _HistoryFeedSnapshot | None:
+        feed = self._history_feed
+        if feed is None or feed.locale != locale:
+            return None
+        if time.monotonic() >= feed.expires_mono:
+            self._history_feed = None
+            return None
+        return feed
+
+    def _project_history_feed(
+        self, key: _HistoryRangeKey, feed: _HistoryFeedSnapshot
+    ) -> tuple[SystemEventHistoryEntry, ...]:
+        start, end, _ = key
+        events = self._history_overlap(feed.events, start, end)
+        self._store_history_range(
+            key, events, truncated=feed.truncated, expires_mono=feed.expires_mono
+        )
+        self._history_using_cached_data = False
+        self._history_truncated = feed.truncated
+        return events
+
+    def _history_fresh_events(
+        self, key: _HistoryRangeKey
+    ) -> tuple[SystemEventHistoryEntry, ...] | None:
+        cached = self._history_cached_range(key)
+        if cached is not None and not cached.truncated:
+            self._history_using_cached_data = False
+            self._history_truncated = False
+            return cached.events
+
+        start, end, locale = key
+        now = time.monotonic()
+        for cached_key, entry in reversed(self._history_range_cache.items()):
+            cached_start, cached_end, cached_locale = cached_key
+            if (
+                cached_locale == locale
+                and cached_start <= start
+                and cached_end >= end
+                and not entry.truncated
+                and now < entry.expires_mono
+            ):
+                break
+        else:
+            if cached is None:
+                return None
+            feed = self._fresh_history_feed(locale)
+            if feed is not None and not feed.truncated:
+                return self._project_history_feed(key, feed)
+            self._history_using_cached_data = False
+            self._history_truncated = True
+            return cached.events
+
+        self._history_range_cache.move_to_end(cached_key)
+        events = tuple(
+            event for event in entry.events if event.end > start and event.start < end
+        )
+        self._store_history_range(
+            key, events, truncated=False, expires_mono=entry.expires_mono
+        )
+        self._history_using_cached_data = False
+        self._history_truncated = False
+        return events
+
     def _store_history_range(
         self,
-        key: tuple[str, str, str],
+        key: _HistoryRangeKey,
         events: tuple[SystemEventHistoryEntry, ...],
         *,
         truncated: bool,
+        failed_prefix: bool = False,
+        expires_mono: float | None = None,
     ) -> None:
+        if expires_mono is None:
+            expires_mono = time.monotonic() + SYSTEM_EVENT_HISTORY_CACHE_TTL
         self._history_range_cache[key] = _HistoryRangeCacheEntry(
-            expires_mono=time.monotonic() + SYSTEM_EVENT_HISTORY_CACHE_TTL,
+            expires_mono=expires_mono,
             events=events,
             truncated=truncated,
+            failed_prefix=failed_prefix,
         )
         self._history_range_cache.move_to_end(key)
         while len(self._history_range_cache) > SYSTEM_EVENT_HISTORY_CACHE_MAX_RANGES:
             self._history_range_cache.popitem(last=False)
 
+    def _discard_failed_history_prefixes(self) -> None:
+        """Drop results tied to a cooldown superseded by a new response."""
+
+        for key, entry in tuple(self._history_range_cache.items()):
+            if entry.failed_prefix:
+                del self._history_range_cache[key]
+
+    def _note_history_failure(self, err: Exception) -> bool:
+        cooldown_started = self.coordinator.note_endpoint_family_failure(
+            SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY, err
+        )
+        if cooldown_started:
+            self._discard_failed_history_prefixes()
+        return cooldown_started
+
+    def _note_history_success(self) -> None:
+        self._discard_failed_history_prefixes()
+        self._history_last_success_utc = dt_util.utcnow()
+        self._history_using_cached_data = False
+        self.coordinator.note_endpoint_family_success(
+            SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
+        )
+
+    @asynccontextmanager
+    async def _history_query(self, locale: str) -> AsyncIterator[_HistoryQuery]:
+        query = _HistoryQuery()
+        pending = self._history_queries.setdefault(locale, set())
+        pending.add(query)
+        try:
+            async with self._history_lock:
+                if not self.coordinator.runtime_active:
+                    raise asyncio.CancelledError
+                yield query
+        finally:
+            pending.remove(query)
+            if not pending:
+                del self._history_queries[locale]
+
     async def async_refresh_history(self) -> None:
         """Probe the homeowner history endpoint without blocking core setup."""
 
-        if not self.history_refresh_due():
+        # An availability probe must never queue behind a multi-page calendar read.
+        if (
+            not self.coordinator.runtime_active
+            or self._history_queries
+            or self._history_lock.locked()
+        ):
             return
-        fetcher = getattr(self.coordinator.client, "homeowner_events_page", None)
-        if not callable(fetcher):
-            return
-        try:
-            payload = await fetcher(
-                next_cursor="start",
-                page_size=SYSTEM_EVENT_HISTORY_PAGE_SIZE,
-                locale=self._history_locale(),
+        async with self._history_lock:
+            if not self.history_refresh_due():
+                return
+            fetcher = getattr(self.coordinator.client, "homeowner_events_page", None)
+            if not callable(fetcher):
+                return
+            try:
+                with runtime_read_scope(lambda: self.coordinator.runtime_active):
+                    payload = await fetcher(
+                        next_cursor="start",
+                        page_size=SYSTEM_EVENT_HISTORY_PAGE_SIZE,
+                        locale=self._history_locale(),
+                    )
+            except EnphaseLoginWallUnauthorized:
+                raise
+            except Exception as err:  # noqa: BLE001
+                self._note_history_failure(err)
+                return
+            parsed = parse_homeowner_event_history(
+                payload,
+                site_id=str(self.coordinator.site_id),
             )
-        except EnphaseLoginWallUnauthorized:
-            raise
-        except Exception as err:  # noqa: BLE001
-            self.coordinator._note_endpoint_family_failure(
-                SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY,
-                err,
+            if parsed is None:
+                self._note_history_failure(
+                    OptionalEndpointUnavailable("System event history unavailable")
+                )
+                return
+            self._history_probe_events = parsed
+            self._note_history_success()
+
+    @staticmethod
+    def _history_overlap(
+        events: Iterable[SystemEventHistoryEntry], start: datetime, end: datetime
+    ) -> tuple[SystemEventHistoryEntry, ...]:
+        return tuple(
+            sorted(
+                (event for event in events if event.end > start and event.start < end),
+                key=lambda event: event.start,
             )
-            return
-        parsed = parse_homeowner_event_history(
-            payload,
-            site_id=str(self.coordinator.site_id),
-        )
-        if parsed is None:
-            self.coordinator._note_endpoint_family_failure(
-                SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY,
-                OptionalEndpointUnavailable("System event history unavailable"),
-            )
-            return
-        self._history_probe_events = parsed
-        self._history_last_success_utc = dt_util.utcnow()
-        self._history_using_cached_data = False
-        self.coordinator._note_endpoint_family_success(
-            SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
         )
 
     async def async_history_events(
@@ -745,20 +927,22 @@ class SystemEventsRuntime:
     ) -> tuple[SystemEventHistoryEntry, ...]:
         """Return sanitized homeowner events overlapping a calendar range."""
 
-        locale = self._history_locale()
-        key = self._history_cache_key(start, end, locale)
-        cached = self._history_cached_range(key)
+        if not self.coordinator.runtime_active:
+            raise asyncio.CancelledError
+        key = self._history_cache_key(start, end, self._history_locale())
+        start, end, locale = key
+        cached = self._history_fresh_events(key)
         if cached is not None:
-            self._history_using_cached_data = False
-            self._history_truncated = cached.truncated
-            return cached.events
+            return cached
 
-        async with self._history_lock:
-            cached = self._history_cached_range(key)
+        async with self._history_query(locale) as query:
+            cached = self._history_fresh_events(key)
             if cached is not None:
-                self._history_using_cached_data = False
-                self._history_truncated = cached.truncated
-                return cached.events
+                return cached
+
+            feed = query.feed
+            if feed is not None and time.monotonic() < feed.expires_mono:
+                return self._project_history_feed(key, feed)
 
             health = self.coordinator._endpoint_family_state(
                 SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
@@ -769,13 +953,7 @@ class SystemEventsRuntime:
                     SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
                 )
             ):
-                stale = (
-                    self._history_cached_range(key, allow_expired=True)
-                    if self.coordinator._endpoint_family_can_use_stale(
-                        SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
-                    )
-                    else None
-                )
+                stale = self._history_fallback(key, allow_failed_prefix=True)
                 self._history_using_cached_data = stale is not None
                 self._history_truncated = (
                     stale.truncated if stale is not None else False
@@ -790,18 +968,19 @@ class SystemEventsRuntime:
             rows_seen = 0
             pages_seen = 0
             events: dict[str, SystemEventHistoryEntry] = {}
-            truncated = False
+            capped = truncated = False
             try:
                 while True:
                     pages_seen += 1
                     if pages_seen > SYSTEM_EVENT_HISTORY_MAX_PAGES:
-                        truncated = True
+                        capped = True
                         break
-                    payload = await fetcher(
-                        next_cursor=cursor,
-                        page_size=SYSTEM_EVENT_HISTORY_PAGE_SIZE,
-                        locale=locale,
-                    )
+                    with runtime_read_scope(lambda: self.coordinator.runtime_active):
+                        payload = await fetcher(
+                            next_cursor=cursor,
+                            page_size=SYSTEM_EVENT_HISTORY_PAGE_SIZE,
+                            locale=locale,
+                        )
                     if not isinstance(payload, dict):
                         raise OptionalEndpointUnavailable(
                             "System event history unavailable"
@@ -815,26 +994,22 @@ class SystemEventsRuntime:
                     bounded_rows = rows[:remaining]
                     bounded_payload = dict(payload)
                     bounded_payload["events"] = bounded_rows
-                    parsed = parse_homeowner_event_history(
+                    parsed = _parse_history_page(
                         bounded_payload,
                         site_id=str(self.coordinator.site_id),
                     )
-                    if parsed is None:  # pragma: no cover - shape validated above
+                    if parsed is None:
                         raise OptionalEndpointUnavailable(
                             "System event history unavailable"
                         )
                     page_truncated = len(rows) > len(bounded_rows)
-                    if page_truncated:
-                        truncated = True
                     rows_seen += len(bounded_rows)
-                    for event in parsed:
+                    truncated = truncated or not parsed.complete
+                    for event in parsed.events:
                         events.setdefault(event.fingerprint, event)
-                    oldest = min((event.start for event in parsed), default=None)
-                    next_value = payload.get("next")
-                    next_cursor = _text(next_value)
-                    if oldest is not None and oldest < start:
-                        break
+                    next_cursor = _text(payload.get("next"))
                     if page_truncated:
+                        capped = True
                         break
                     if not next_cursor:
                         break
@@ -842,47 +1017,57 @@ class SystemEventsRuntime:
                         truncated = True
                         break
                     if rows_seen >= SYSTEM_EVENT_HISTORY_ROW_LIMIT:
-                        truncated = True
+                        capped = True
                         break
                     seen_cursors.add(cursor)
                     cursor = next_cursor
             except EnphaseLoginWallUnauthorized:
                 raise
             except Exception as err:  # noqa: BLE001
-                self.coordinator._note_endpoint_family_failure(
-                    SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY,
-                    err,
-                )
-                stale = (
-                    self._history_cached_range(key, allow_expired=True)
-                    if self.coordinator._endpoint_family_can_use_stale(
+                cooldown_started = self._note_history_failure(err)
+                stale = self._history_fallback(key)
+                self._history_using_cached_data = stale is not None
+                if stale is not None:
+                    self._history_truncated = stale.truncated
+                    return stale.events
+                # A validated prefix can support an exact query during cooldown.
+                partial = self._history_overlap(events.values(), start, end)
+                self._history_truncated = pages_seen > 1
+                deadline = (
+                    self.coordinator.endpoint_family_next_retry_mono(
                         SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
                     )
+                    if cooldown_started and self._history_truncated
                     else None
                 )
-                self._history_using_cached_data = stale is not None
-                self._history_truncated = (
-                    stale.truncated if stale is not None else False
-                )
-                return stale.events if stale is not None else ()
+                if deadline is not None:
+                    self._store_history_range(
+                        key,
+                        partial,
+                        truncated=True,
+                        failed_prefix=True,
+                        expires_mono=deadline,
+                    )
+                return partial
 
-            overlapping = tuple(
-                sorted(
-                    (
-                        event
-                        for event in events.values()
-                        if event.end > start and event.start < end
-                    ),
-                    key=lambda event: event.start,
-                )
+            scan_events = tuple(events.values())
+            expires = time.monotonic() + SYSTEM_EVENT_HISTORY_CACHE_TTL
+            # Mixed-validity pages and repeated cursors cannot validate a scan.
+            self._history_feed = (
+                _HistoryFeedSnapshot(locale, expires, scan_events, capped)
+                if not truncated and SYSTEM_EVENT_HISTORY_MAX_PAGES > 0
+                else None
             )
-            self._store_history_range(key, overlapping, truncated=truncated)
-            self._history_last_success_utc = dt_util.utcnow()
-            self._history_using_cached_data = False
+            if self._history_feed is not None:
+                for pending in self._history_queries[locale]:
+                    pending.feed = self._history_feed
+            truncated = capped or truncated
+            overlapping = self._history_overlap(scan_events, start, end)
+            self._store_history_range(
+                key, overlapping, truncated=truncated, expires_mono=expires
+            )
             self._history_truncated = truncated
-            self.coordinator._note_endpoint_family_success(
-                SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
-            )
+            self._note_history_success()
             return overlapping
 
     def _entry_suffix(self) -> str:
@@ -935,31 +1120,20 @@ class SystemEventsRuntime:
             entries[key[1]] = entry
         return entries
 
-    def _existing_issue_ids(self, *, active_only: bool = False) -> set[str]:
-        """Return event issue IDs already persisted by Home Assistant."""
-
-        entries = self._registry_issue_entries()
-        if entries is None:
-            return set(
-                self._active_reported_issue_ids
-                if active_only
-                else self._reported_issue_ids
-            )
-        existing = {
+    def _existing_issue_ids(
+        self, entries: Mapping[str, object], *, active_only: bool = False
+    ) -> set[str]:
+        """Combine the registry snapshot with runtime-tracked issue IDs."""
+        if not active_only:
+            return self._reported_issue_ids | entries.keys()
+        return (self._active_reported_issue_ids - entries.keys()) | {
             issue_id
             for issue_id, entry in entries.items()
-            if not active_only or getattr(entry, "active", True) is True
+            if getattr(entry, "active", True) is True
         }
-        if active_only:
-            return existing | (self._active_reported_issue_ids - entries.keys())
-        return existing | self._reported_issue_ids
 
-    def _restore_repair_last_seen(self) -> None:
+    def _restore_repair_last_seen(self, entries: Mapping[str, object]) -> None:
         """Restore persisted Repair checkpoints from issue-registry data."""
-
-        entries = self._registry_issue_entries()
-        if not entries:
-            return
         for issue_id, entry in entries.items():
             data = getattr(entry, "data", None)
             if not isinstance(data, dict):
@@ -977,7 +1151,7 @@ class SystemEventsRuntime:
     def _clear_repairs(self) -> None:
         """Remove all persisted System Event Repairs for this config entry."""
 
-        for issue_id in self._existing_issue_ids():
+        for issue_id in self._existing_issue_ids(self._registry_issue_entries() or {}):
             ir.async_delete_issue(self.coordinator.hass, DOMAIN, issue_id)
         self._reported_issue_ids.clear()
         self._active_reported_issue_ids.clear()
@@ -1008,9 +1182,10 @@ class SystemEventsRuntime:
             if alarm.fingerprint not in resolved_fingerprints
         }
         active_issue_ids = set(active_alarms)
-        self._restore_repair_last_seen()
-        existing = self._existing_issue_ids()
-        active_existing = self._existing_issue_ids(active_only=True)
+        entries = self._registry_issue_entries() or {}
+        self._restore_repair_last_seen(entries)
+        existing = self._existing_issue_ids(entries)
+        active_existing = self._existing_issue_ids(entries, active_only=True)
         for issue_id in active_alarms:
             self._repair_last_seen_utc[issue_id] = observed_at
         missing_issue_ids = existing - active_issue_ids
@@ -1031,7 +1206,9 @@ class SystemEventsRuntime:
         with async_refresh_issue_set(
             self.coordinator.hass, existing, existing - delete_issue_ids
         ):
-            self._create_alarm_issues(active_alarms, active_existing, observed_at)
+            self._create_alarm_issues(
+                active_alarms, active_existing, entries, observed_at
+            )
         self._reported_issue_ids = (existing | set(active_alarms)) - delete_issue_ids
         self._active_reported_issue_ids = set(active_alarms)
 
@@ -1039,21 +1216,19 @@ class SystemEventsRuntime:
         self,
         active_alarms: dict[str, StandingAlarm],
         active_existing: set[str],
+        entries: Mapping[str, object],
         observed_at: datetime,
     ) -> None:
         """Update alarm checkpoints without deleting and recreating repairs."""
+        ownership = entry_issue_kwargs(self.coordinator.config_entry)
         for issue_id, alarm in active_alarms.items():
             checkpoint = self._repair_checkpoint_utc.get(issue_id)
             if (
                 issue_id in active_existing
                 and (
-                    not entry_issue_kwargs(self.coordinator.config_entry)
-                    or getattr(
-                        (self._registry_issue_entries() or {}).get(issue_id),
-                        "config_entry_id",
-                        None,
-                    )
-                    == getattr(self.coordinator.config_entry, "entry_id", None)
+                    not ownership
+                    or getattr(entries.get(issue_id), "config_entry_id", None)
+                    == ownership["config_entry_id"]
                 )
                 and checkpoint is not None
                 and observed_at - checkpoint < SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL
@@ -1063,7 +1238,7 @@ class SystemEventsRuntime:
                 self.coordinator.hass,
                 DOMAIN,
                 issue_id,
-                **entry_issue_kwargs(self.coordinator.config_entry),
+                **ownership,
                 is_fixable=False,
                 is_persistent=False,
                 severity=ir.IssueSeverity.ERROR,
