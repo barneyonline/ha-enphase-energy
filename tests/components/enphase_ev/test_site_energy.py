@@ -148,6 +148,9 @@ def test_directional_battery_ignores_leading_zero_as_support_for_inactive_pair(
     }
     flows, _ = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    payload["charge"] = [0, 1]
+    flows, _ = _assemble_directional_site_energy(coordinator_factory().energy, payload)
+    assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
     payload["charge"] = [0, 0]
     flows, _ = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert flows.keys() >= DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
@@ -394,9 +397,12 @@ async def test_directional_battery_requires_fresh_source_progress(
     assert not manager.site_energy.keys() & keys
 
 
-@pytest.mark.parametrize("has_all_directions", [False, True])
+@pytest.mark.parametrize(
+    ("has_all_directions", "retry_invalid"),
+    [(False, False), (True, False), (True, True)],
+)
 async def test_directional_battery_retries_when_site_context_arrives(
-    directional_battery_payload, monkeypatch, has_all_directions
+    directional_battery_payload, monkeypatch, has_all_directions, retry_invalid
 ) -> None:
     now = datetime.fromtimestamp(1_700_000_001, timezone.utc)
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
@@ -417,13 +423,17 @@ async def test_directional_battery_retries_when_site_context_arrives(
     assert not manager.site_energy_refresh_due()
     zone = "UTC"
     assert manager.site_energy_refresh_due() is has_all_directions
+    if retry_invalid:
+        client.lifetime_energy.return_value = {"last_report_date": "malformed"}
     await manager._async_refresh_site_energy()
     if has_all_directions:
-        assert keys <= manager.site_energy.keys()
         assert client.lifetime_energy.await_count == 2
+        assert (keys <= manager.site_energy.keys()) is not retry_invalid
     else:
         client.lifetime_energy.assert_awaited_once()
     assert not manager.site_energy_refresh_due()
+    await manager._async_refresh_site_energy()
+    assert client.lifetime_energy.await_count == (2 if has_all_directions else 1)
 
 
 @pytest.mark.parametrize("variant", ["truncated", "relabeled", "subdaily"])

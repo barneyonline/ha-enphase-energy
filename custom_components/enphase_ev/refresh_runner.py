@@ -27,6 +27,7 @@ from .log_redaction import redact_site_id, redact_text
 from .refresh_plan import (
     STARTUP_CURRENT_POWER_PLAN,
     STARTUP_POWER_PLAN,
+    WARMUP_STAGE_DEADLINE_S,
     BoundRefreshCall,
     RefreshPlan,
     bind_refresh_plan,
@@ -466,6 +467,16 @@ class RefreshRunner:
                 if not coordinator.runtime_active:
                     return
                 if warmup_data or self._warmup_site_state_available():
+                    publish_stage()
+            context_refresh_due = getattr(
+                getattr(coordinator, "energy", None),
+                "directional_battery_context_refresh_due",
+                None,
+            )
+            if callable(context_refresh_due) and context_refresh_due():
+                async with asyncio.timeout(WARMUP_STAGE_DEADLINE_S):
+                    await self.async_refresh_site_energy_for_warmup()
+                if coordinator.runtime_active:
                     publish_stage()
         except asyncio.CancelledError:
             raise

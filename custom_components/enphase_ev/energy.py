@@ -248,7 +248,7 @@ class EnergyManager:
         force_refresh = (
             force
             or self._site_energy_force_refresh
-            or self._directional_context_refresh_due()
+            or self.directional_battery_context_refresh_due()
         )
         now_mono = time.monotonic()
         if (
@@ -649,7 +649,8 @@ class EnergyManager:
             return {}
         return self._directional_battery.totals(payload, start_date, source)
 
-    def _directional_context_refresh_due(self) -> bool:
+    def directional_battery_context_refresh_due(self) -> bool:
+        """Check whether later site metadata can qualify a fresh lifetime read."""
         if not self._directional_battery.site_context_refresh_due():
             return False
         source = self._site_energy_meta.get("last_report_date")
@@ -1204,11 +1205,8 @@ class EnergyManager:
     async def _async_refresh_site_energy_locked(self, *, force: bool) -> None:
         """Refresh lifetime energy cache with TTL enforcement."""
         generation = self._site_energy_cache_generation
-        force_refresh = (
-            force
-            or self._site_energy_force_refresh
-            or self._directional_context_refresh_due()
-        )
+        context_retry = self.directional_battery_context_refresh_due()
+        force_refresh = force or self._site_energy_force_refresh or context_retry
         now_mono = time.monotonic()
         if self._service_backoff_active():
             return
@@ -1218,6 +1216,12 @@ class EnergyManager:
             and (now_mono - self._site_energy_refresh_ts) < self._site_energy_cache_ttl
         ):
             return
+        if context_retry:
+            # Consume the metadata-triggered retry before reading. A malformed
+            # response must obey the usual cache TTL on the following poll.
+            await self._directional_battery.async_load()
+            if self._site_energy_read_superseded(generation):
+                return
         self._site_energy_force_refresh = False
         self._site_energy_fetch_attempts += 1
         self._site_energy_fetch_diagnostics.update(
