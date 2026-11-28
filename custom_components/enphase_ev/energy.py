@@ -122,6 +122,7 @@ class EnergyManager:
         self._site_energy_fetch_failures = 0
         self._site_energy_unchanged_responses = 0
         self._site_energy_source_timestamp: datetime | None = None
+        self._directional_battery_report_date: datetime | None = None
         self._site_energy_fetch_diagnostics: dict[str, object] = {}
         self._site_energy_meta: dict[str, object] = {}
         self._site_energy_cache_ts: float | None = None
@@ -328,7 +329,9 @@ class EnergyManager:
         except Exception:
             self._service_backoff_ends_utc = None
 
-    def _parse_site_energy_timestamp(self, value: object) -> datetime | None:
+    def _parse_site_energy_timestamp(
+        self, value: object, *, require_time: bool = False
+    ) -> datetime | None:
         """Best-effort parsing for last_report_date fields."""
         if value is None or isinstance(value, bool):
             return None
@@ -350,12 +353,14 @@ class EnergyManager:
                 except ValueError:
                     return None
                 return self._parse_site_energy_timestamp(numeric)
+            if require_time and "T" not in cleaned.upper() and " " not in cleaned:
+                return None
             parsed_dt = None
             try:
                 parsed_dt = dt_util.parse_datetime(cleaned)
             except Exception:  # noqa: BLE001
                 parsed_dt = None
-            if parsed_dt is None:
+            if parsed_dt is None and not require_time:
                 try:
                     parsed_date = dt_util.parse_date(cleaned)
                 except Exception:  # noqa: BLE001
@@ -653,11 +658,9 @@ class EnergyManager:
         """Check whether later site metadata can qualify a fresh lifetime read."""
         if not self._directional_battery.site_context_refresh_due():
             return False
-        source = self._site_energy_meta.get("last_report_date")
         lengths = self._site_energy_meta.get("raw_bucket_lengths")
         return (
-            isinstance(source, datetime)
-            and directional_battery_source_is_fresh(source)
+            directional_battery_source_is_fresh(self._directional_battery_report_date)
             and isinstance(lengths, dict)
             and all(
                 lengths.get(field)
@@ -1270,6 +1273,9 @@ class EnergyManager:
             payload.get("last_report_date") if isinstance(payload, dict) else None
         )
         source = self._parse_site_energy_timestamp(raw_source)
+        directional_source = self._parse_site_energy_timestamp(
+            raw_source, require_time=True
+        )
         malformed_source = raw_source is not None and source is None
         progress = self._site_energy_source_progress(
             source, self._site_energy_source_timestamp
@@ -1305,12 +1311,14 @@ class EnergyManager:
         if (
             accept
             and isinstance(payload, dict)
-            and directional_battery_source_is_fresh(source)
+            and directional_battery_source_is_fresh(directional_source)
         ):
             await self._directional_battery.async_load()
             if self._site_energy_read_superseded(generation):
                 return
-            directional_totals = self._directional_battery_totals(payload, source)
+            directional_totals = self._directional_battery_totals(
+                payload, directional_source
+            )
             if directional_totals:
                 self._directional_battery_save_idle.clear()
                 try:
@@ -1342,6 +1350,7 @@ class EnergyManager:
         self._record_site_energy_source(source, progress)
         self._mark_service_available()
         if accept:
+            self._directional_battery_report_date = directional_source
             self._site_energy_cache_ts = self._site_energy_refresh_ts
             if accepted_hems_source is not None:
                 self._hems_lifetime_source_timestamp = accepted_hems_source

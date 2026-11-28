@@ -43,7 +43,9 @@ from .device_info_helpers import device_info_fields
 
 
 def _assemble_directional_site_energy(manager, payload):
-    source = manager._parse_site_energy_timestamp(payload.get("last_report_date"))
+    source = manager._parse_site_energy_timestamp(
+        payload.get("last_report_date"), require_time=True
+    )
     return manager._aggregate_site_energy(
         payload, directional_totals=manager._directional_battery_totals(payload, source)
     )
@@ -395,6 +397,25 @@ async def test_directional_battery_requires_fresh_source_progress(
     now += timedelta(minutes=31)
     await manager._async_refresh_site_energy(force=True)
     assert not manager.site_energy.keys() & keys
+
+
+async def test_directional_battery_requires_time_in_report_cursor(
+    coordinator_factory, directional_battery_payload, monkeypatch
+) -> None:
+    now = datetime(2023, 11, 14, 0, 5, tzinfo=timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    payload = directional_battery_payload
+    payload["last_report_date"] = now.date().isoformat()
+    client = SimpleNamespace(lifetime_energy=AsyncMock(return_value=payload))
+    manager = coordinator_factory(client=client).energy
+    keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    await manager._async_refresh_site_energy(force=True)
+    assert not manager.site_energy.keys() & keys
+    assert manager.site_energy["battery_charge"].value_kwh == 4.032
+
+    payload["last_report_date"] = now.isoformat()
+    await manager._async_refresh_site_energy(force=True)
+    assert keys <= manager.site_energy.keys()
 
 
 @pytest.mark.parametrize(
