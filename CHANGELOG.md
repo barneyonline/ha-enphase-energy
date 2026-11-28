@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### 🐛 Bug fixes
+
+- Honor Enphase session-history cooldowns for queued reads and preserve longer Retry-After deadlines.
+
+### 🔧 Improvements
+
+- Share overlapping session-history reads and reuse complete System Events calendar ranges.
+- Reduce System Events processing for large payloads, Repairs, and diagnostic sensor updates.
+
 ## v5.5.0 - 2026-11-26
 
 ### 🚧 Breaking changes

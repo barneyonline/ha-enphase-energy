@@ -204,7 +204,10 @@ def test_topology_refresh_reuses_summary_caches_for_unchanged_sources(
 
 def test_session_history_apply_updates_skips_unchanged_publish(
     coordinator_factory,
+    monkeypatch,
 ) -> None:
+    today = datetime(2026, 2, 2, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(dt_util, "now", lambda: today)
     coord = coordinator_factory(serials=["EV1", "EV2"])
     sessions = [{"session_id": "cached", "energy_kwh": 1.25}]
     coord.data = {
@@ -218,13 +221,13 @@ def test_session_history_apply_updates_skips_unchanged_publish(
     publish = MagicMock()
     coord.session_history._publish_callback = publish  # noqa: SLF001
 
-    coord.session_history._apply_updates({"EV1": list(sessions)})  # noqa: SLF001
+    coord.session_history._apply_updates({"EV1": list(sessions)}, today)  # noqa: SLF001
 
     publish.assert_not_called()
 
     fresh_sessions = [{"session_id": "fresh", "energy_kwh": 2.0}]
 
-    coord.session_history._apply_updates({"EV1": fresh_sessions})  # noqa: SLF001
+    coord.session_history._apply_updates({"EV1": fresh_sessions}, today)  # noqa: SLF001
 
     publish.assert_called_once()
     merged = publish.call_args.args[0]

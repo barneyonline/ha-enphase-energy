@@ -41,6 +41,7 @@ from .errors import (
     EnlightenAuthUnavailable,
     EnlightenReadSuperseded,
     _safe_response_error_message,
+    make_response_error,
 )
 
 _LOGGER = logging.getLogger("custom_components.enphase_ev.api")
@@ -181,6 +182,9 @@ _enlighten_read_is_current: ContextVar[Callable[[], bool] | None] = ContextVar(
 _enlighten_read_can_dispatch: ContextVar[Callable[[], bool] | None] = ContextVar(
     "enphase_ev_enlighten_read_can_dispatch", default=None
 )
+_enlighten_retired_rate_limit: ContextVar[
+    Callable[[aiohttp.ClientResponseError], None] | None
+] = ContextVar("enphase_ev_enlighten_retired_rate_limit", default=None)
 _enlighten_read_allows_reauth: ContextVar[bool] = ContextVar(
     "enphase_ev_enlighten_read_allows_reauth", default=True
 )
@@ -782,11 +786,17 @@ def guarded_read_scope(
     *,
     can_dispatch: Callable[[], bool] | None = None,
     allow_reauth: bool = True,
+    on_retired_rate_limit: Callable[[aiohttp.ClientResponseError], None] | None = None,
 ) -> Iterator[None]:
-    """Set the read's validity, admission, and authentication policy."""
+    """Set read guards and optionally handle HTTP 429 as soon as headers arrive.
+
+    A current throttled read raises the response error. For a retired read,
+    the observer receives the same site-wide signal before the read is rejected.
+    """
 
     token = _enlighten_read_is_current.set(is_current)
     admission_token = _enlighten_read_can_dispatch.set(can_dispatch)
+    rate_limit_token = _enlighten_retired_rate_limit.set(on_retired_rate_limit)
     reauth_token = _enlighten_read_allows_reauth.set(
         allow_reauth and _enlighten_read_allows_reauth.get()
     )
@@ -794,6 +804,7 @@ def guarded_read_scope(
         yield
     finally:
         _enlighten_read_allows_reauth.reset(reauth_token)
+        _enlighten_retired_rate_limit.reset(rate_limit_token)
         _enlighten_read_can_dispatch.reset(admission_token)
         _enlighten_read_is_current.reset(token)
 
@@ -836,6 +847,21 @@ def check_enlighten_read_current() -> None:
     is_current = _enlighten_read_is_current.get()
     if is_current is not None and not is_current():
         raise EnlightenReadSuperseded
+
+
+def check_guarded_read_response(response: aiohttp.ClientResponse) -> None:
+    """Handle opted-in rate limits at headers, before reading a potentially slow body."""
+    observer = _enlighten_retired_rate_limit.get()
+    if observer is None or response.status != 429:
+        check_enlighten_read_current()
+        return
+    error = make_response_error(response, None)
+    try:
+        check_enlighten_read_current()
+    except EnlightenReadSuperseded:
+        observer(error)
+        raise
+    raise error
 
 
 def check_enlighten_read_admission() -> None:

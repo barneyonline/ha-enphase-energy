@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import pytest
 from homeassistant.helpers import issue_registry as ir
 
@@ -404,11 +406,15 @@ def _runtime_coordinator(
     repairs_enabled: bool = True,
 ) -> SimpleNamespace:
     health = SimpleNamespace(consecutive_failures=0)
+    record_failure = MagicMock(return_value=False)
+    record_success = MagicMock()
     if alarm_payload is _DEFAULT_ALARMS:
         alarm_payload = _standing_alarm_payload()
     return SimpleNamespace(
         hass=hass,
         site_id="1234567",
+        runtime_active=True,
+        inventory_view=SimpleNamespace(),
         config_entry=(
             SimpleNamespace(
                 entry_id=entry_id,
@@ -426,8 +432,10 @@ def _runtime_coordinator(
         _endpoint_family_wait_active=lambda family: False,
         _endpoint_family_can_use_stale=lambda family: True,
         _endpoint_family_state=lambda family: health,
-        _note_endpoint_family_failure=MagicMock(),
-        _note_endpoint_family_success=MagicMock(),
+        _note_endpoint_family_failure=record_failure,
+        note_endpoint_family_failure=record_failure,
+        _note_endpoint_family_success=record_success,
+        note_endpoint_family_success=record_success,
     )
 
 
@@ -657,7 +665,7 @@ async def test_runtime_history_marks_page_cap_and_repeated_cursor_truncated(
         "custom_components.enphase_ev.system_events.SYSTEM_EVENT_HISTORY_MAX_PAGES",
         100,
     )
-    runtime._history_range_cache.clear()  # noqa: SLF001
+    runtime = SystemEventsRuntime(coordinator)
     coordinator.client.homeowner_events_page = AsyncMock(
         return_value={
             "events": [{"id": "1", "event_date": 1770000200}],
@@ -1031,7 +1039,9 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
         "custom_components.enphase_ev.system_events.ir.async_get",
         lambda _hass: SimpleNamespace(issues=None),
     )
-    assert runtime._existing_issue_ids() == {stale_issue}  # noqa: SLF001
+    assert runtime._existing_issue_ids(  # noqa: SLF001
+        runtime._registry_issue_entries() or {}  # noqa: SLF001
+    ) == {stale_issue}
 
     monkeypatch.setattr(
         "custom_components.enphase_ev.system_events.ir.async_get",
@@ -1050,13 +1060,13 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
             }
         ),
     )
-    assert runtime._existing_issue_ids(active_only=True) == {  # noqa: SLF001
-        active_issue
-    }
+    assert runtime._existing_issue_ids(  # noqa: SLF001
+        runtime._registry_issue_entries() or {}, active_only=True  # noqa: SLF001
+    ) == {active_issue}
 
 
 @pytest.mark.asyncio
-async def test_runtime_bounds_active_event_attributes(hass) -> None:
+async def test_runtime_bounds_active_event_attributes(hass, monkeypatch) -> None:
     rows = [
         {
             "id": f"event-{index}",
@@ -1073,16 +1083,31 @@ async def test_runtime_bounds_active_event_attributes(hass) -> None:
         _runtime_coordinator(
             hass,
             payload={"events": rows},
-            alarm_payload={"alarms": []},
+            alarm_payload=_standing_alarm_payload(),
+            repairs_enabled=False,
         )
     )
 
     await runtime.async_refresh()
 
-    assert runtime.active_count == ACTIVE_EVENTS_ATTRIBUTE_LIMIT + 5
-    assert len(runtime.active_event_attributes) == ACTIVE_EVENTS_ATTRIBUTE_LIMIT
+    generated = []
+    iter_events = runtime._iter_activity_events
+
+    def count_rows():
+        for row in iter_events():
+            generated.append(row)
+            yield row
+
+    monkeypatch.setattr(runtime, "_iter_activity_events", count_rows)
+    attributes = runtime.active_event_attributes
+    assert len(generated) == ACTIVE_EVENTS_ATTRIBUTE_LIMIT
+    assert attributes[0]["type"] == "Standing Alarm"
+    assert attributes[1]["type"] == "Routine 0"
+    assert len(runtime.activity_events) == ACTIVE_EVENTS_ATTRIBUTE_LIMIT + 6
+    assert runtime.active_count == ACTIVE_EVENTS_ATTRIBUTE_LIMIT + 6
+    assert len(attributes) == ACTIVE_EVENTS_ATTRIBUTE_LIMIT
     assert runtime.problem_active is True
-    assert set(runtime.active_event_attributes[0]) == {
+    assert set(attributes[1]) == {
         "type",
         "device_type",
         "state",
@@ -1091,9 +1116,7 @@ async def test_runtime_bounds_active_event_attributes(hass) -> None:
         "severity",
         "description",
     }
-    assert runtime.active_event_attributes[0]["event_date"] == (
-        "2026-07-11T01:02:03+00:00"
-    )
+    assert attributes[1]["event_date"] == ("2026-07-11T01:02:03+00:00")
 
 
 def test_runtime_unavailable_diagnostics(hass) -> None:
@@ -1122,7 +1145,9 @@ def test_runtime_ignores_invalid_persisted_last_seen(hass, monkeypatch) -> None:
         ),
     )
 
-    runtime._restore_repair_last_seen()  # noqa: SLF001
+    runtime._restore_repair_last_seen(  # noqa: SLF001
+        runtime._registry_issue_entries() or {}  # noqa: SLF001
+    )
 
     assert runtime._repair_last_seen_utc == {}  # noqa: SLF001
 
@@ -1298,3 +1323,819 @@ def test_activity_descriptions_redact_identifiers_from_other_devices():
         assert "DEVICE-PRIVATE-9999" not in item.description
         assert "OTHER-SERIAL-PRIVATE" not in item.description
         assert "offline" in item.description
+
+
+@pytest.mark.parametrize("standing", [False, True])
+def test_system_dashboard_redacts_serials_found_in_other_rows(standing) -> None:
+    serial = "ABC-123456789"
+    longer = serial + "-LONG"
+    if standing:
+        events = parse_standing_alarms(
+            {
+                "alarms": [
+                    {"id": "first", "serial_num": serial, "description": longer},
+                    {"id": "second", "serial_num": longer},
+                    {"id": "third", "serial_num": longer},
+                ]
+            },
+            site_id="1234567",
+        )
+    else:
+        events = parse_active_system_events(
+            {
+                "events": [
+                    {"id": "first", "serial_number": serial, "details": longer},
+                    {"id": "second", "serial_number": longer},
+                    {"id": "third", "serial_number": longer},
+                ]
+            },
+            site_id="1234567",
+        )
+    assert events[0].description == "ABC-...LONG"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "case", ["contained", "expired", "truncated", "row-cap", "locale", "wider"]
+)
+async def test_calendar_reuses_only_fresh_complete_same_locale_ranges(
+    hass, monkeypatch, case
+) -> None:
+    from custom_components.enphase_ev import system_events
+
+    now = 1000.0
+    monkeypatch.setattr(system_events, "time", SimpleNamespace(monotonic=lambda: now))
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    start = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    end = start + timedelta(hours=4)
+    rows = [
+        {
+            "id": "outside",
+            "description": "Outside",
+            "event_date": (start + timedelta(hours=3)).timestamp(),
+        },
+        {
+            "id": "within",
+            "description": "Within",
+            "event_date": (start + timedelta(hours=1, minutes=30)).timestamp(),
+        },
+        {
+            "id": "crossing",
+            "description": "Crossing",
+            "event_date": start.timestamp(),
+            "event_clear_date": (start + timedelta(hours=2)).timestamp(),
+        },
+    ]
+    fetch = coordinator.client.homeowner_events_page
+    cursor = {"truncated": "start", "row-cap": "older"}.get(case)
+    fetch.return_value = {"events": rows, "next": cursor}
+    with monkeypatch.context() as cap_patch:
+        if case == "row-cap":
+            cap_patch.setattr(
+                system_events, "SYSTEM_EVENT_HISTORY_ROW_LIMIT", len(rows)
+            )
+        assert len(await runtime.async_history_events(start, end)) == 3
+    fetch.return_value = {"events": rows, "next": None}
+    narrow_start = start + timedelta(hours=1)
+    narrow_end = start + timedelta(hours=2)
+    if case == "expired":
+        now += system_events.SYSTEM_EVENT_HISTORY_CACHE_TTL
+    elif case == "locale":
+        monkeypatch.setattr(runtime, "_history_locale", lambda: "fr")
+    elif case == "wider":
+        narrow_start = start - timedelta(hours=1)
+    events = await runtime.async_history_events(narrow_start, narrow_end)
+    assert [event.summary for event in events] == ["Crossing", "Within"]
+    assert fetch.await_count == (1 if case == "contained" else 2)
+    assert not runtime.history_diagnostics()["truncated"]
+    assert runtime.history_diagnostics()["cached_range_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_alarm_reconciliation_reuses_registry_snapshot(
+    hass, alarm_repair_entry, monkeypatch
+) -> None:
+    coordinator = _runtime_coordinator(
+        hass,
+        payload={"events": []},
+        alarm_payload={
+            "alarms": [
+                {"id": f"alarm-{index}", "severity": "error"} for index in range(8)
+            ]
+        },
+    )
+    coordinator.config_entry = alarm_repair_entry
+    runtime = SystemEventsRuntime(coordinator)
+    await runtime.async_refresh()
+    registry = ir.async_get(hass)
+    initial = tuple(registry.issues.values())
+    assert len(initial) == 8
+
+    snapshot = MagicMock(wraps=runtime._registry_issue_entries)
+    monkeypatch.setattr(runtime, "_registry_issue_entries", snapshot)
+    await runtime.async_refresh()
+
+    snapshot.assert_called_once_with()
+    assert all(
+        current is previous
+        for current, previous in zip(registry.issues.values(), initial, strict=True)
+    )
+
+
+@pytest.mark.parametrize("standing", [False, True])
+def test_dashboard_redaction_masks_serials_that_cross_another_serial(standing) -> None:
+    first = "101234565678"
+    second = "567812345678"
+    overlapping = first + second[4:]
+    if standing:
+        entries = parse_standing_alarms(
+            {
+                "alarms": [
+                    {"id": "one", "serial_num": first, "description": overlapping},
+                    {"id": "two", "serial_num": second},
+                ]
+            },
+            site_id="9999999",
+        )
+    else:
+        entries = parse_active_system_events(
+            {
+                "events": [
+                    {"id": "one", "serial_number": first, "details": overlapping},
+                    {"id": "two", "serial_number": second},
+                ]
+            },
+            site_id="9999999",
+        )
+    assert entries[0].description == "[redacted]"
+
+
+@pytest.mark.asyncio
+async def test_history_range_fetch_finds_spanning_events_on_later_pages(hass) -> None:
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    coordinator = _runtime_coordinator(hass)
+    fetch = coordinator.client.homeowner_events_page
+
+    async def page(*, next_cursor, **kwargs):
+        if next_cursor == "start":
+            return {
+                "events": [
+                    {
+                        "id": "old-instant",
+                        "description": "Already finished",
+                        "event_date": (day + timedelta(hours=2)).timestamp(),
+                    }
+                ],
+                "next": "older",
+            }
+        assert next_cursor == "older"
+        return {
+            "events": [
+                {
+                    "id": "overlap",
+                    "description": "Crossing",
+                    "event_date": (day + timedelta(hours=1)).timestamp(),
+                    "event_clear_date": (
+                        day + timedelta(hours=3, minutes=30)
+                    ).timestamp(),
+                }
+            ],
+            "next": None,
+        }
+
+    fetch.side_effect = page
+    start = day + timedelta(hours=3)
+    end = day + timedelta(hours=4)
+    cold = SystemEventsRuntime(coordinator)
+    results = await cold.async_history_events(start, end)
+    assert [event.summary for event in results] == ["Crossing"]
+    assert fetch.await_count == 2
+
+    warm = SystemEventsRuntime(coordinator)
+    await warm.async_history_events(day, day + timedelta(hours=5))
+    assert fetch.await_count == 4
+    assert await warm.async_history_events(start, end) == results
+    assert fetch.await_count == 4
+
+
+@pytest.mark.asyncio
+async def test_calendar_preserves_matching_rows_when_a_later_page_fails(
+    coordinator_factory, monkeypatch
+) -> None:
+    from custom_components.enphase_ev import coordinator as coordinator_module
+    from custom_components.enphase_ev import system_events
+
+    now = 1000.0
+    clock = SimpleNamespace(monotonic=lambda: now)
+    monkeypatch.setattr(system_events, "time", clock)
+    monkeypatch.setattr(coordinator_module, "time", clock)
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    coordinator = coordinator_factory()
+    runtime = coordinator.system_events_runtime
+    page = {
+        "events": [
+            {"id": "old", "event_date": day.timestamp(), "description": "Outside"},
+            {
+                "id": "inside",
+                "event_date": (day + timedelta(hours=2)).timestamp(),
+                "description": "Inside",
+            },
+        ],
+        "next": "older",
+    }
+    fetch = AsyncMock(
+        side_effect=[
+            page,
+            aiohttp.ClientResponseError(
+                SimpleNamespace(real_url="https://example.invalid/history"),
+                (),
+                status=429,
+                headers={"Retry-After": "1800"},
+            ),
+            aiohttp.ClientResponseError(
+                SimpleNamespace(real_url="https://example.invalid/history"),
+                (),
+                status=400,
+            ),
+            {**page, "next": None},
+        ]
+    )
+    monkeypatch.setattr(coordinator.client, "homeowner_events_page", fetch)
+    family = SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
+    start, end = day + timedelta(hours=1), day + timedelta(hours=3)
+
+    entries = await runtime.async_history_events(start, end)
+    assert [event.summary for event in entries] == ["Inside"]
+    assert runtime.history_diagnostics()["truncated"]
+    assert runtime.history_diagnostics()["cached_range_count"] == 1
+    assert not runtime.history_available
+    assert coordinator._endpoint_family_state(family).consecutive_failures == 1
+    assert coordinator._endpoint_family_wait_active(family)
+    assert not coordinator._endpoint_family_can_use_stale(family)
+
+    assert await runtime.async_history_events(start, end) == entries
+    assert runtime.history_diagnostics()["using_cached_data"]
+    assert runtime.history_diagnostics()["truncated"]
+    assert await runtime.async_history_events(day + timedelta(minutes=90), end) == ()
+    now += system_events.SYSTEM_EVENT_HISTORY_CACHE_TTL
+    assert await runtime.async_history_events(start, end) == entries
+    assert fetch.await_count == 2
+
+    now = 2801.0
+    assert await runtime.async_history_events(start, end) == ()
+    assert not runtime.history_diagnostics()["using_cached_data"]
+    assert await runtime.async_history_events(start, end) == entries
+    assert fetch.await_count == 4
+    assert not runtime.history_diagnostics()["truncated"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("warm", [False, True])
+async def test_calendar_does_not_cache_failed_prefix_without_cooldown(
+    coordinator_factory, monkeypatch, warm
+) -> None:
+    coordinator = coordinator_factory()
+    runtime = coordinator.system_events_runtime
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    end = day + timedelta(hours=1)
+    event = {"id": "event", "event_date": day.timestamp(), "description": "Seen"}
+    fetch = AsyncMock(
+        side_effect=[
+            {"events": [event], "next": "older"},
+            aiohttp.ClientResponseError(
+                SimpleNamespace(real_url="https://example.invalid/history"),
+                (),
+                status=400,
+            ),
+            {"events": [event], "next": None},
+        ]
+    )
+    monkeypatch.setattr(coordinator.client, "homeowner_events_page", fetch)
+    family = SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
+    if warm:
+        coordinator.note_endpoint_family_success(family)
+        assert coordinator.endpoint_family_next_retry_mono(family) is not None
+
+    partial = await runtime.async_history_events(day, end)
+    assert [row.summary for row in partial] == ["Seen"]
+    assert runtime.history_diagnostics()["truncated"]
+    assert runtime.history_diagnostics()["cached_range_count"] == 0
+    assert await runtime.async_history_events(day, end) == partial
+    assert not runtime.history_diagnostics()["truncated"]
+    assert fetch.await_count == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [400, 429])
+@pytest.mark.parametrize("probe_succeeds", [False, True])
+async def test_probe_discards_failed_calendar_prefix_when_cooldown_changes(
+    coordinator_factory, monkeypatch, status, probe_succeeds
+) -> None:
+    from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+    from custom_components.enphase_ev import coordinator as coordinator_module
+    from custom_components.enphase_ev import system_events
+
+    now = 1000.0
+    clock = SimpleNamespace(monotonic=lambda: now)
+    monkeypatch.setattr(system_events, "time", clock)
+    monkeypatch.setattr(coordinator_module, "time", clock)
+    coordinator = coordinator_factory()
+    runtime = coordinator.system_events_runtime
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    end = day + timedelta(hours=1)
+    event = {"id": "event", "event_date": day.timestamp(), "description": "Seen"}
+    page = {"events": [event], "next": "older"}
+    request = SimpleNamespace(real_url="https://example.invalid/history")
+    probe = (
+        {"events": [], "next": None}
+        if probe_succeeds
+        else aiohttp.ClientResponseError(request, (), status=503)
+    )
+    fetch = AsyncMock(
+        side_effect=[
+            page,
+            aiohttp.ClientResponseError(
+                request, (), status=429, headers={"Retry-After": "3600"}
+            ),
+            probe,
+            aiohttp.ClientResponseError(request, (), status=status),
+        ]
+    )
+    monkeypatch.setattr(coordinator.client, "homeowner_events_page", fetch)
+
+    async def run_history_probe(self):
+        await runtime.async_refresh_history()
+
+    monkeypatch.setattr(
+        DataUpdateCoordinator, "async_request_refresh", run_history_probe
+    )
+
+    assert [row.summary for row in await runtime.async_history_events(day, end)] == [
+        "Seen"
+    ]
+    assert runtime.history_diagnostics()["cached_range_count"] == 1
+    now += 10
+    await coordinator.async_request_refresh()
+    assert runtime.history_available is probe_succeeds
+    assert runtime.history_diagnostics()["cached_range_count"] == 0
+    if not probe_succeeds:
+        assert await runtime.async_history_events(day, end) == ()
+        assert fetch.await_count == 3
+        # The probe's shorter cooldown has expired, while the original would last.
+        now = 3100.0
+    assert await runtime.async_history_events(day, end) == ()
+    assert fetch.await_count == 4
+
+
+@pytest.mark.asyncio
+async def test_calendar_cap_does_not_repeat_the_feed_scan_for_other_ranges(
+    hass, monkeypatch
+) -> None:
+    from custom_components.enphase_ev import system_events
+
+    now = 1000.0
+    monkeypatch.setattr(system_events, "time", SimpleNamespace(monotonic=lambda: now))
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    page_size = system_events.SYSTEM_EVENT_HISTORY_PAGE_SIZE
+    cap = system_events.SYSTEM_EVENT_HISTORY_ROW_LIMIT
+    assert cap % page_size == 0
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def page(*, next_cursor, page_size, **kwargs):
+        first = 0 if next_cursor == "start" else int(next_cursor)
+        if first == 0:
+            entered.set()
+            await release.wait()
+        return {
+            "events": [
+                {"id": str(i), "event_date": (day - timedelta(minutes=i)).timestamp()}
+                for i in range(first, first + page_size)
+            ],
+            "next": str(first + page_size),
+        }
+
+    fetch = coordinator.client.homeowner_events_page
+    fetch.side_effect = page
+    start, end = day - timedelta(minutes=20), day + timedelta(minutes=1)
+    narrow = day - timedelta(minutes=5)
+    async with asyncio.timeout(15):
+        first = asyncio.create_task(runtime.async_history_events(start, end))
+        await entered.wait()
+        contained = asyncio.create_task(runtime.async_history_events(narrow, end))
+        separate = asyncio.create_task(
+            runtime.async_history_events(
+                day - timedelta(hours=30), day - timedelta(hours=29)
+            )
+        )
+        await asyncio.sleep(0)
+        release.set()
+        wide, selected, disjoint = await asyncio.gather(first, contained, separate)
+
+    assert len(wide) == 21
+    assert selected == wide[-6:]
+    assert len(disjoint) == 60
+    assert fetch.await_count == cap // page_size
+    assert runtime.history_diagnostics()["truncated"]
+
+    now += system_events.SYSTEM_EVENT_HISTORY_CACHE_TTL / 2
+    assert await runtime.async_history_events(narrow, end) == selected
+    assert fetch.await_count == cap // page_size
+
+    now += system_events.SYSTEM_EVENT_HISTORY_CACHE_TTL / 2
+    fetch.side_effect = None
+    fetch.return_value = {"events": [], "next": None}
+    assert await runtime.async_history_events(narrow, end) == ()
+    assert fetch.await_count == cap // page_size + 1
+    assert not runtime.history_diagnostics()["truncated"]
+
+
+@pytest.mark.asyncio
+async def test_complete_feed_replaces_an_older_exact_incomplete_result(hass) -> None:
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    first = {"id": "first", "event_date": day.timestamp(), "description": "First"}
+    second = {
+        "id": "second",
+        "event_date": (day + timedelta(minutes=1)).timestamp(),
+        "description": "Second",
+    }
+    fetch = coordinator.client.homeowner_events_page
+    fetch.side_effect = [
+        {"events": [first], "next": "start"},
+        {"events": [second, first], "next": None},
+    ]
+    end = day + timedelta(minutes=2)
+    assert [row.summary for row in await runtime.async_history_events(day, end)] == [
+        "First"
+    ]
+    assert runtime.history_diagnostics()["truncated"]
+
+    # A disjoint query obtains the full feed. The incomplete exact entry cannot win.
+    assert (
+        await runtime.async_history_events(
+            day - timedelta(hours=2), day - timedelta(hours=1)
+        )
+        == ()
+    )
+    assert [row.summary for row in await runtime.async_history_events(day, end)] == [
+        "First",
+        "Second",
+    ]
+    assert fetch.await_count == 2
+    assert not runtime.history_diagnostics()["truncated"]
+
+
+@pytest.mark.asyncio
+async def test_calendar_feed_lookup_discards_expired_snapshot(hass, monkeypatch):
+    from custom_components.enphase_ev import system_events
+
+    now = 1000.0
+    monkeypatch.setattr(system_events, "time", SimpleNamespace(monotonic=lambda: now))
+    coordinator = _runtime_coordinator(hass, history_payload={"events": []})
+    runtime = SystemEventsRuntime(coordinator)
+    start = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    await runtime.async_history_events(start, start + timedelta(hours=1))
+    locale = runtime._history_locale()
+    assert runtime._fresh_history_feed(locale) is not None
+
+    now += system_events.SYSTEM_EVENT_HISTORY_CACHE_TTL
+    assert runtime._fresh_history_feed(locale) is None
+    assert runtime._history_feed is None
+
+
+@pytest.mark.asyncio
+async def test_malformed_terminal_page_cannot_establish_empty_coverage(hass) -> None:
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    fetch = coordinator.client.homeowner_events_page
+    fetch.side_effect = [
+        {"events": [{"event_date": "broken"}], "next": None},
+        {
+            "events": [
+                {"id": "valid", "event_date": day.timestamp(), "description": "Valid"}
+            ],
+            "next": None,
+        },
+    ]
+
+    assert await runtime.async_history_events(day, day + timedelta(hours=2)) == ()
+    assert not runtime.history_available
+    assert runtime.history_diagnostics()["cached_range_count"] == 0
+    coordinator._note_endpoint_family_failure.assert_called_once()
+    recovered = await runtime.async_history_events(day, day + timedelta(hours=1))
+    assert [event.summary for event in recovered] == ["Valid"]
+    assert fetch.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_contained_calendar_result_keeps_source_expiry_and_stale_fallback(
+    hass, monkeypatch
+) -> None:
+    from custom_components.enphase_ev import system_events
+
+    now = 1000.0
+    monkeypatch.setattr(system_events, "time", SimpleNamespace(monotonic=lambda: now))
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    fetch = coordinator.client.homeowner_events_page
+    fetch.side_effect = [
+        {
+            "events": [
+                {"id": "kept", "event_date": day.timestamp(), "description": "Kept"}
+            ],
+            "next": None,
+        },
+        aiohttp.ClientResponseError(
+            SimpleNamespace(real_url="https://example.invalid/history"), (), status=503
+        ),
+    ]
+
+    expected = await runtime.async_history_events(day, day + timedelta(hours=2))
+    now += system_events.SYSTEM_EVENT_HISTORY_CACHE_TTL / 2
+    narrow_end = day + timedelta(hours=1)
+    assert await runtime.async_history_events(day, narrow_end) == expected
+    assert fetch.await_count == 1
+
+    now += system_events.SYSTEM_EVENT_HISTORY_CACHE_TTL / 2
+    assert await runtime.async_history_events(day, narrow_end) == expected
+    assert fetch.await_count == 2
+    assert runtime.history_diagnostics()["using_cached_data"]
+
+
+@pytest.mark.asyncio
+async def test_wider_calendar_query_reloads_changed_tail_behind_unchanged_head(hass):
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    current_time = (day + timedelta(hours=3)).timestamp()
+    old_time = (day + timedelta(hours=1)).timestamp()
+    head = {
+        "events": [
+            {"id": "recent", "description": "Recent", "event_date": current_time}
+        ],
+        "next": "same-anchor",
+    }
+    older = {"id": "older", "description": "Before", "event_date": old_time}
+    fetch = coordinator.client.homeowner_events_page
+    fetch.side_effect = [
+        head,
+        {"events": [older], "next": None},
+        head,
+        {
+            "events": [
+                {**older, "description": "After"},
+                {"id": "new", "description": "New", "event_date": old_time + 60},
+            ],
+            "next": None,
+        },
+    ]
+
+    end = day + timedelta(hours=4)
+    narrow = await runtime.async_history_events(day + timedelta(hours=2), end)
+    assert [row.summary for row in narrow] == ["Recent"]
+    wide = await runtime.async_history_events(day, end)
+    assert [row.summary for row in wide] == ["After", "New", "Recent"]
+    assert fetch.await_count == 4
+    assert not runtime.history_diagnostics()["truncated"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid_field", ["row", "start", "clear", "inverted"])
+async def test_mixed_validity_calendar_page_displays_rows_without_claiming_coverage(
+    hass, invalid_field
+):
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    valid = {"id": "valid", "event_date": day.timestamp(), "description": "Valid"}
+    uncertain_rows = {
+        "row": [valid, {"event_date": "broken"}],
+        "start": [{**valid, "event_start_date": "broken"}],
+        "clear": [{**valid, "event_clear_date": "broken"}],
+        "inverted": [{**valid, "event_clear_date": day.timestamp() - 1}],
+    }
+    fetch = coordinator.client.homeowner_events_page
+    fetch.side_effect = [
+        {"events": uncertain_rows[invalid_field], "next": None},
+        {"events": [valid], "next": None},
+    ]
+
+    results = await runtime.async_history_events(day, day + timedelta(hours=2))
+    assert [event.summary for event in results] == ["Valid"]
+    assert runtime.history_diagnostics()["truncated"]
+    assert await runtime.async_history_events(day, day + timedelta(hours=1)) == results
+    assert fetch.await_count == 2
+    assert not runtime.history_diagnostics()["truncated"]
+
+
+@pytest.mark.asyncio
+async def test_calendar_scan_never_blocks_the_background_probe(
+    coordinator_factory, monkeypatch
+):
+    coordinator = coordinator_factory()
+    runtime = coordinator.system_events_runtime
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    start, end = day, day + timedelta(hours=1)
+    entered_tail, release_tail = asyncio.Event(), asyncio.Event()
+    release_probe = asyncio.Event()
+    cursors = []
+
+    async def page(*, next_cursor, **kwargs):
+        cursors.append(next_cursor)
+        if next_cursor == "older":
+            entered_tail.set()
+            await release_tail.wait()
+            raise aiohttp.ClientResponseError(
+                SimpleNamespace(real_url="https://example.invalid/history"),
+                (),
+                status=429,
+                headers={"Retry-After": "1800"},
+            )
+        if len(cursors) > 1:
+            await release_probe.wait()
+        return {
+            "events": [
+                {"id": "kept", "event_date": day.timestamp(), "description": "Kept"}
+            ],
+            "next": "older",
+        }
+
+    monkeypatch.setattr(coordinator.client, "homeowner_events_page", page)
+    family = SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
+    async with asyncio.timeout(5):
+        query = asyncio.create_task(runtime.async_history_events(start, end))
+        await entered_tail.wait()
+        try:
+            await asyncio.wait_for(runtime.async_refresh_history(), timeout=1)
+            assert not query.done()
+            assert cursors == ["start", "older"]
+        finally:
+            release_tail.set()
+            release_probe.set()
+            partial = await query
+
+    assert cursors == ["start", "older"]
+    assert coordinator._endpoint_family_wait_active(family)
+    assert coordinator._endpoint_family_state(family).consecutive_failures == 1
+    assert [event.summary for event in partial] == ["Kept"]
+    assert await runtime.async_history_events(start, end) == partial
+    assert cursors == ["start", "older"]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_availability_probe_does_not_wait_for_first_probe(hass):
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def fetch(**kwargs):
+        entered.set()
+        await release.wait()
+        return {"events": [], "next": None}
+
+    coordinator.client.homeowner_events_page = AsyncMock(side_effect=fetch)
+    probe = asyncio.create_task(runtime.async_refresh_history())
+    async with asyncio.timeout(5):
+        try:
+            await entered.wait()
+            await asyncio.wait_for(runtime.async_refresh_history(), timeout=1)
+            assert not probe.done()
+        finally:
+            release.set()
+            await probe
+    coordinator.client.homeowner_events_page.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("feed_expires", [False, True])
+async def test_queued_calendar_query_keeps_its_locale_feed(
+    hass, monkeypatch, feed_expires
+):
+    from custom_components.enphase_ev import system_events
+
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    entered_english, release_english = asyncio.Event(), asyncio.Event()
+    entered_italian, release_italian = asyncio.Event(), asyncio.Event()
+    requested_locales = []
+    language = "en"
+    now = 1000.0
+    monkeypatch.setattr(system_events, "time", SimpleNamespace(monotonic=lambda: now))
+    monkeypatch.setattr(runtime, "_history_locale", lambda: language)
+
+    async def fetch(*, locale, **kwargs):
+        requested_locales.append(locale)
+        if requested_locales == ["en"]:
+            entered_english.set()
+            await release_english.wait()
+        if locale == "it":
+            entered_italian.set()
+            await release_italian.wait()
+        return {
+            "events": [
+                {"id": "early", "event_date": day.timestamp(), "description": locale},
+                {
+                    "id": "late",
+                    "event_date": (day + timedelta(hours=2)).timestamp(),
+                    "description": locale,
+                },
+            ],
+            "next": None,
+        }
+
+    coordinator.client.homeowner_events_page.side_effect = fetch
+    async with asyncio.timeout(5), asyncio.TaskGroup() as tasks:
+        first = tasks.create_task(
+            runtime.async_history_events(
+                day + timedelta(hours=2), day + timedelta(hours=3)
+            )
+        )
+        await entered_english.wait()
+        language = "it"
+        second = tasks.create_task(
+            runtime.async_history_events(day, day + timedelta(hours=1))
+        )
+        await asyncio.sleep(0)
+        language = "en"
+        third = tasks.create_task(
+            runtime.async_history_events(day, day + timedelta(hours=1))
+        )
+        await asyncio.sleep(0)
+        release_english.set()
+        await entered_italian.wait()
+        if feed_expires:
+            now += system_events.SYSTEM_EVENT_HISTORY_CACHE_TTL
+        release_italian.set()
+
+    assert [row.summary for row in first.result()] == ["en"]
+    assert [row.summary for row in second.result()] == ["it"]
+    assert [row.summary for row in third.result()] == ["en"]
+    assert requested_locales == (["en", "it", "en"] if feed_expires else ["en", "it"])
+    assert not runtime._history_queries
+
+
+@pytest.mark.asyncio
+async def test_retired_calendar_cancels_active_and_queued_queries(
+    coordinator_factory, monkeypatch
+):
+    coordinator = coordinator_factory()
+    runtime = coordinator.system_events_runtime
+    day = datetime(2026, 2, 2, tzinfo=timezone.utc)
+    end = day + timedelta(hours=1)
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def held_page(**kwargs):
+        entered.set()
+        await release.wait()
+        return {"events": [], "next": "older"}
+
+    fetch = AsyncMock(side_effect=held_page)
+    monkeypatch.setattr(coordinator.client, "homeowner_events_page", fetch)
+    family = SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
+    health_before = replace(coordinator._endpoint_family_state(family))
+    async with asyncio.timeout(5), asyncio.TaskGroup() as tasks:
+        active = tasks.create_task(runtime.async_history_events(day, end))
+        await entered.wait()
+        queued = tasks.create_task(
+            runtime.async_history_events(day - timedelta(days=1), end)
+        )
+        await asyncio.sleep(0)
+        coordinator.mark_runtime_stopped()
+        release.set()
+
+    assert active.cancelled()
+    assert queued.cancelled()
+    with pytest.raises(asyncio.CancelledError):
+        await runtime.async_history_events(day, end)
+    await runtime.async_refresh_history()
+    fetch.assert_awaited_once()
+    assert not runtime._history_queries
+    assert runtime.history_diagnostics()["cached_range_count"] == 0
+    assert not runtime.history_available
+    assert coordinator._endpoint_family_state(family) == health_before
+
+
+@pytest.mark.asyncio
+async def test_retired_history_probe_does_not_publish(hass):
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+
+    async def retire(**kwargs):
+        coordinator.runtime_active = False
+        return {"events": [], "next": None}
+
+    coordinator.client.homeowner_events_page.side_effect = retire
+    with pytest.raises(asyncio.CancelledError):
+        await runtime.async_refresh_history()
+
+    assert not runtime.history_available
+    coordinator._note_endpoint_family_success.assert_not_called()
+    coordinator._note_endpoint_family_failure.assert_not_called()

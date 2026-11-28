@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 
 _EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b")
 _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
@@ -179,11 +180,68 @@ def _normalize_iterable(values: Iterable[object] | None) -> list[str]:
     return normalized
 
 
+@dataclass(slots=True)
+class _IdentifierPrefix:
+    children: dict[str, _IdentifierPrefix] = field(default_factory=dict)
+    mask: str | None = None
+
+
+def prepare_identifier_redaction(
+    identifiers: Iterable[object],
+) -> Callable[[str], str]:
+    """Prepare exact serial replacements for repeated use on one payload."""
+    root = _IdentifierPrefix()
+    for identifier in dict.fromkeys(_normalize_iterable(identifiers)):
+        prefix = root
+        for char in identifier:
+            child = prefix.children.get(char)
+            if child is None:
+                child = prefix.children[char] = _IdentifierPrefix()
+            prefix = child
+        prefix.mask = redact_identifier(identifier)
+    if not root.children:
+        return str
+
+    def replace(text: str) -> str:
+        chunks: list[str] = []
+        masked = ""
+        end = 0
+        for start, initial in enumerate(text):
+            prefix: _IdentifierPrefix | None = root.children.get(initial)
+            if prefix is None:
+                continue
+            matches: list[tuple[int, str]] = []
+            stop = start + 1
+            while prefix is not None:
+                if prefix.mask is not None:
+                    matches.append((stop, prefix.mask))
+                if stop == len(text):
+                    break
+                prefix = prefix.children.get(text[stop])
+                stop += 1
+            for stop, replacement in reversed(matches):
+                if start >= end:
+                    chunks.extend((masked, text[end:start]))
+                    masked = replacement
+                    end = stop
+                elif stop > end or text[start:stop] in masked:
+                    # A truncated suffix could otherwise reveal an overlapping ID.
+                    masked = "[redacted]"
+                    end = max(end, stop)
+        if not chunks:
+            return text
+        chunks.extend((masked, text[end:]))
+        return "".join(chunks)
+
+    return replace
+
+
 def redact_text(
     value: object,
     *,
     site_ids: Iterable[object] | None = None,
     identifiers: Iterable[object] | None = None,
+    replace_identifiers: Callable[[str], str] | None = None,
     max_length: int = 512,
 ) -> str:
     """Return compact text with common Enphase identifiers removed."""
@@ -197,6 +255,8 @@ def redact_text(
     if not text:
         return ""
 
+    if replace_identifiers is not None:
+        text = replace_identifiers(text)
     for identifier in _normalize_iterable(identifiers):
         text = text.replace(identifier, redact_identifier(identifier))
 
