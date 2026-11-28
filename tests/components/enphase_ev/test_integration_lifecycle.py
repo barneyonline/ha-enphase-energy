@@ -221,7 +221,8 @@ async def test_directional_battery_real_platform_lifecycle(
     await _finish_startup(hass, config_entry)
     registry = er.async_get(hass)
     coord = config_entry.runtime_data.coordinator
-    assert len(optional_scopes) >= 2 and all(optional_scopes)
+    # The core read keeps its normal scope and the deferred retry is optional.
+    assert optional_scopes == [False, True]
     assert "directional_battery_energy_s" in coord._warmup_phase_timings
     ids = {
         key: registry.async_get_entity_id(
