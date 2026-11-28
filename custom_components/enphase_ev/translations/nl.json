@@ -800,7 +800,7 @@
               "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is. Standaard: Afgeleid van de telemetrie van de lader indien beschikbaar; anders gebaseerd op de Home Assistant-regio, met een terugvalwaarde van 230 V.",
               "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger. Standaard: Ingeschakeld.",
               "battery_schedules_enabled": "Beheer schema's voor de IQ Battery. Standaard: Ingeschakeld.",
-              "directional_battery_energy_enabled": "Toont voor het energiedashboard de cumulatieve energie van het net en de zonnepanelen naar de batterij en van de batterij naar het huis en het net. Standaard ingeschakeld.",
+              "directional_battery_energy_enabled": "Toont voor het energiedashboard de cumulatieve energie van het net en de zonnepanelen naar de batterij en van de batterij naar het huis en het net. Toont ook geverifieerde vermogensschattingen op basis van cloudgegevens. Standaard ingeschakeld.",
               "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in. Standaard: Uitgeschakeld.",
               "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld. Standaard: Uitgeschakeld."
             }
@@ -842,7 +842,7 @@
           "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is. Standaard: Afgeleid van de telemetrie van de lader indien beschikbaar; anders gebaseerd op de Home Assistant-regio, met een terugvalwaarde van 230 V.",
           "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger. Standaard: Ingeschakeld.",
           "battery_schedules_enabled": "Beheer schema's voor de IQ Battery. Standaard: Ingeschakeld.",
-          "directional_battery_energy_enabled": "Toont voor het energiedashboard de cumulatieve energie van het net en de zonnepanelen naar de batterij en van de batterij naar het huis en het net. Standaard ingeschakeld.",
+          "directional_battery_energy_enabled": "Toont voor het energiedashboard de cumulatieve energie van het net en de zonnepanelen naar de batterij en van de batterij naar het huis en het net. Toont ook geverifieerde vermogensschattingen op basis van cloudgegevens. Standaard ingeschakeld.",
           "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in. Standaard: Uitgeschakeld.",
           "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is. Vereist installateurstoegang. Standaard: Uitgeschakeld.",
           "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld. Standaard: Uitgeschakeld.",
@@ -1473,6 +1473,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Gemeten om (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Vermogen van het net naar de batterij",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemeten om (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Laatste venster (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Vermogen van de zonnepanelen naar de batterij",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemeten om (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Laatste venster (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Vermogen van de batterij naar het huis",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemeten om (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Laatste venster (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Vermogen van de batterij naar het net",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemeten om (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Laatste venster (s)"
           }
         }
       },

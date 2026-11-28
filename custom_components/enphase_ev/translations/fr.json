@@ -800,7 +800,7 @@
               "nominal_voltage": "Tension d’alimentation CA habituelle utilisée pour estimer la puissance lorsque la tension en direct est indisponible. Par défaut: Déterminé par la télémétrie du chargeur lorsqu’elle est disponible ; sinon selon la région de Home Assistant, avec une valeur de repli de 230 V.",
               "schedule_sync_enabled": "Gérer les plannings de l’IQ EV Charger. Par défaut: Activé.",
               "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery. Par défaut: Activé.",
-              "directional_battery_energy_enabled": "Affiche pour le tableau de bord Énergie les cumuls du réseau et des panneaux solaires vers la batterie, ainsi que de la batterie vers le logement et le réseau. Activé par défaut.",
+              "directional_battery_energy_enabled": "Affiche pour le tableau de bord Énergie les cumuls du réseau et des panneaux solaires vers la batterie, ainsi que de la batterie vers le logement et le réseau. Inclut les estimations de puissance issues des données du cloud lorsqu’elles sont vérifiées. Activé par défaut.",
               "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur. Par défaut: Désactivé.",
               "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut. Par défaut: Désactivé."
             }
@@ -842,7 +842,7 @@
           "nominal_voltage": "Tension d’alimentation CA habituelle utilisée pour estimer la puissance lorsque la tension en direct est indisponible. Par défaut: Déterminé par la télémétrie du chargeur lorsqu’elle est disponible ; sinon selon la région de Home Assistant, avec une valeur de repli de 230 V.",
           "schedule_sync_enabled": "Gérer les plannings de l’IQ EV Charger. Par défaut: Activé.",
           "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery. Par défaut: Activé.",
-          "directional_battery_energy_enabled": "Affiche pour le tableau de bord Énergie les cumuls du réseau et des panneaux solaires vers la batterie, ainsi que de la batterie vers le logement et le réseau. Activé par défaut.",
+          "directional_battery_energy_enabled": "Affiche pour le tableau de bord Énergie les cumuls du réseau et des panneaux solaires vers la batterie, ainsi que de la batterie vers le logement et le réseau. Inclut les estimations de puissance issues des données du cloud lorsqu’elles sont vérifiées. Activé par défaut.",
           "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur. Par défaut: Désactivé.",
           "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible. Nécessite un accès installateur. Par défaut: Désactivé.",
           "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut. Par défaut: Désactivé.",
@@ -1473,6 +1473,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Mesuré à (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Puissance du réseau vers la batterie",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Dernière fenêtre (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Puissance solaire vers la batterie",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Dernière fenêtre (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Puissance de la batterie vers le logement",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Dernière fenêtre (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Puissance de la batterie vers le réseau",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Dernière fenêtre (s)"
           }
         }
       },

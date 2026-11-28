@@ -800,7 +800,7 @@
               "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat. Alapértelmezés: A töltő telemetriájából, ha elérhető; egyébként a Home Assistant régiója alapján, 230 V tartalékértékkel.",
               "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése. Alapértelmezés: Bekapcsolva.",
               "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése. Alapértelmezés: Bekapcsolva.",
-              "directional_battery_energy_enabled": "Az Energia irányítópulton megjeleníti a hálózatból és a napelemekből az akkumulátorba, illetve az akkumulátorból az otthonba és a hálózatba jutó összesített energiát. Alapértelmezetten engedélyezve.",
+              "directional_battery_energy_enabled": "Az Energia irányítópulton megjeleníti a hálózatból és a napelemekből az akkumulátorba, illetve az akkumulátorból az otthonba és a hálózatba jutó összesített energiát. Ellenőrzött esetben felhőadatokból számított teljesítménybecsléseket is tartalmaz. Alapértelmezetten engedélyezve.",
               "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt. Alapértelmezés: Kikapcsolva.",
               "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva. Alapértelmezés: Kikapcsolva."
             }
@@ -842,7 +842,7 @@
           "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat. Alapértelmezés: A töltő telemetriájából, ha elérhető; egyébként a Home Assistant régiója alapján, 230 V tartalékértékkel.",
           "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése. Alapértelmezés: Bekapcsolva.",
           "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése. Alapértelmezés: Bekapcsolva.",
-          "directional_battery_energy_enabled": "Az Energia irányítópulton megjeleníti a hálózatból és a napelemekből az akkumulátorba, illetve az akkumulátorból az otthonba és a hálózatba jutó összesített energiát. Alapértelmezetten engedélyezve.",
+          "directional_battery_energy_enabled": "Az Energia irányítópulton megjeleníti a hálózatból és a napelemekből az akkumulátorba, illetve az akkumulátorból az otthonba és a hálózatba jutó összesített energiát. Ellenőrzött esetben felhőadatokból számított teljesítménybecsléseket is tartalmaz. Alapértelmezetten engedélyezve.",
           "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt. Alapértelmezés: Kikapcsolva.",
           "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria. Telepítői hozzáférést igényel. Alapértelmezés: Kikapcsolva.",
           "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva. Alapértelmezés: Kikapcsolva.",
@@ -1473,6 +1473,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Mintavételezve ekkor (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Teljesítmény a hálózatból az akkumulátorba",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mintavételezve ekkor (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Utolsó ablak (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Teljesítmény a napelemekből az akkumulátorba",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mintavételezve ekkor (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Utolsó ablak (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Teljesítmény az akkumulátorból az otthonba",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mintavételezve ekkor (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Utolsó ablak (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Teljesítmény az akkumulátorból a hálózatba",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mintavételezve ekkor (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Utolsó ablak (s)"
           }
         }
       },

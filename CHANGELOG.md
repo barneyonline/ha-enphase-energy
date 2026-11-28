@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### 🔧 Improvements
+
+- Prepare four directional IQ Battery power sensors for the Home Assistant 2026.12 Energy Dashboard. Entity registration awaits validation that Enphase's directional counters advance coherently over short report windows.
+
 ## v5.6.0 - 2026-11-28
 
 ### 🚧 Breaking changes

@@ -7,6 +7,7 @@ from collections.abc import Callable
 import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from itertools import chain
 from typing import Any, cast
 
 from homeassistant.components.sensor import (
@@ -33,6 +34,10 @@ from .const import (
 from .coordinator import EnphaseCoordinator
 from .current_power_runtime import is_idle_power_sample
 from .device_info_helpers import _cloud_device_info
+from .directional_battery_power import (
+    DIRECTIONAL_BATTERY_POWER_FIELDS,
+    DirectionalBatteryPowerReading,
+)
 from .energy import (
     LIFETIME_RESET_DROP_THRESHOLD_KWH,
     LIFETIME_RESET_FLOOR_KWH,
@@ -40,7 +45,11 @@ from .energy import (
     SiteEnergyFlow,
     directional_battery_source_is_fresh,
 )
-from .power_validation import EXTREME_SITE_POWER_W, ExtremePowerValidator
+from .power_validation import (
+    EXTREME_SITE_POWER_W,
+    ExtremePowerValidator,
+    site_power_sample_is_plausible,
+)
 from .power_average import AverageUpdate, EnergyPowerAverage, WINDOW_SECONDS
 from .power_restore import (
     PowerHistory,
@@ -672,9 +681,6 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
     _DEFAULT_WINDOW_S = 300.0
     _MIN_DELTA_KWH = 0.0005
     _RESET_DROP_KWH = 0.25
-    _OUTLIER_MIN_POWER_W = 100_000
-    _OUTLIER_MIN_DELTA_KWH = 5.0
-    _OUTLIER_RELATIVE_FLOW_RATIO = 0.15
 
     def __init__(
         self,
@@ -1045,11 +1051,13 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                     self._clear_restored_live_history(discard_power=True)
                     self._discard_restored_baseline()
                     return
-                if not self._power_sample_is_plausible(
-                    power_w=restored_power_w,
-                    signed_delta_kwh=signed_delta_kwh,
-                    current_values=self._last_flow_kwh,
-                    previous_values=self._previous_live_flow_kwh,
+                if not site_power_sample_is_plausible(
+                    restored_power_w,
+                    signed_delta_kwh,
+                    chain(
+                        self._last_flow_kwh.values(),
+                        self._previous_live_flow_kwh.values(),
+                    ),
                 ):
                     self._clear_restored_live_history(discard_power=True)
                     self._discard_restored_baseline()
@@ -1135,38 +1143,6 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             else getattr(self._coord, "site_energy_meta", None)
         )
         return meta if isinstance(meta, dict) else {}
-
-    @classmethod
-    def _power_sample_is_plausible(
-        self,
-        *,
-        power_w: int,
-        signed_delta_kwh: float,
-        current_values: dict[str, float],
-        previous_values: dict[str, float],
-    ) -> bool:
-        """Reject obviously corrupt cumulative-delta samples without capping large sites."""
-
-        abs_power_w = abs(power_w)
-        abs_delta_kwh = abs(signed_delta_kwh)
-        if (
-            abs_power_w < self._OUTLIER_MIN_POWER_W
-            or abs_delta_kwh < self._OUTLIER_MIN_DELTA_KWH
-        ):
-            return True
-
-        flow_scale_kwh = 0.0
-        for value in (*current_values.values(), *previous_values.values()):
-            try:
-                numeric = abs(float(value))
-            except Exception:
-                continue
-            flow_scale_kwh = max(flow_scale_kwh, numeric)
-
-        if flow_scale_kwh <= 0:
-            return True
-
-        return abs_delta_kwh < (flow_scale_kwh * self._OUTLIER_RELATIVE_FLOW_RATIO)
 
     def _flow_supported(self, flow_key: str) -> bool:
         if flow_key in self._site_energy_flows():
@@ -1743,11 +1719,10 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             self._last_power_w = candidate_power_w
             self._last_method = "extreme_confirmed"
             return self._last_power_w
-        if not self._power_sample_is_plausible(
-            power_w=candidate_power_w,
-            signed_delta_kwh=signed_delta_kwh,
-            current_values=current_values,
-            previous_values=previous_live_flow_kwh,
+        if not site_power_sample_is_plausible(
+            candidate_power_w,
+            signed_delta_kwh,
+            chain(current_values.values(), previous_live_flow_kwh.values()),
         ):
             self._last_power_w = prior_last_power_w
             self._last_method = "outlier_ignored"
@@ -2822,6 +2797,58 @@ class EnphaseBatteryPowerSensor(_EnphaseSiteLifetimePowerSensor):
             flow_signs={"battery_discharge": 1, "battery_charge": -1},
             type_key=None,
         )
+
+
+class EnphaseDirectionalBatteryPowerSensor(_SiteBaseEntity):
+    """One source-window average in a verified group on the IQ Battery device."""
+
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _unrecorded_attributes = _SiteBaseEntity._unrecorded_attributes | frozenset(
+        {"sampled_at_utc", "last_window_seconds"}
+    )
+
+    def __init__(self, coord: EnphaseCoordinator, key: str) -> None:
+        super().__init__(coord, key, key, type_key="encharge")
+        self._attr_translation_key = key
+        self._field = DIRECTIONAL_BATTERY_POWER_FIELDS[key]
+        self._averaging_enabled = _power_averaging_enabled(coord)
+
+    def _reading(self) -> DirectionalBatteryPowerReading | None:
+        snapshot = self._coord.directional_battery_power_snapshot
+        if snapshot is None:
+            return None
+        return snapshot.average if self._averaging_enabled else snapshot.interval
+
+    def _freshness_deadline(self) -> datetime | None:
+        reading = self._reading()
+        if reading is None:
+            return None
+        return reading.reported_at + timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)
+
+    @property
+    def available(self) -> bool:
+        return (
+            self._reading() is not None
+            and site_battery_device_available(self._coord)
+            and super().available
+        )
+
+    @property
+    def native_value(self) -> int | None:
+        reading = self._reading()
+        return reading.watts[self._field] if reading is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        reading = self._reading()
+        if reading is None:
+            return {}
+        return {
+            "sampled_at_utc": reading.reported_at.isoformat(),
+            "last_window_seconds": reading.window_seconds,
+        }
 
 
 class EnphaseCurrentPowerConsumptionSensor(_EnphaseSiteLifetimePowerSensor):

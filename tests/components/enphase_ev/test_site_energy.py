@@ -28,6 +28,7 @@ from custom_components.enphase_ev.energy import (
     LifetimeGuardState,
     SiteEnergyFlow,
 )
+from custom_components.enphase_ev.power_validation import site_power_sample_is_plausible
 from custom_components.enphase_ev.sensor import (
     EnphaseBatteryPowerSensor,
     EnphaseGridPowerSensor,
@@ -42,12 +43,15 @@ from custom_components.enphase_ev.sensor import (
 from .device_info_helpers import device_info_fields
 
 
-def _assemble_directional_site_energy(manager, payload):
+def _assemble_directional_site_energy(manager, payload, *, for_power=False):
     source = manager._parse_site_energy_timestamp(
         payload.get("last_report_date"), require_time=True
     )
     return manager._aggregate_site_energy(
-        payload, directional_totals=manager._directional_battery_totals(payload, source)
+        payload,
+        directional_totals=manager._directional_battery_totals(
+            payload, source, for_power=for_power
+        ),
     )
 
 
@@ -318,14 +322,17 @@ def test_directional_battery_requires_previously_accepted_coverage(
     assert manager.site_energy["battery_energy_from_grid"].value_kwh == 2.952
 
 
+@pytest.mark.parametrize("for_power", [False, True])
 @pytest.mark.parametrize("corrected", [False, True])
 def test_directional_battery_reconciles_across_bucket_rollover(
-    coordinator_factory, directional_battery_payload, corrected
+    coordinator_factory, directional_battery_payload, corrected, for_power
 ) -> None:
     manager = coordinator_factory().energy
     payload = directional_battery_payload
     keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
-    manager.site_energy, _ = _assemble_directional_site_energy(manager, payload)
+    manager.site_energy, _ = _assemble_directional_site_energy(
+        manager, payload, for_power=for_power
+    )
     assert manager.site_energy.keys() >= keys
     latest_grid, latest_solar = (102, 420) if corrected else (202, 320)
     next_payload = {
@@ -338,12 +345,90 @@ def test_directional_battery_reconciles_across_bucket_rollover(
         "battery_grid": [None, 0, 0, 100],
         "discharge": [None, 1301, 902, 100],
     }
-    flows, _ = _assemble_directional_site_energy(manager, next_payload)
-    if corrected:
+    flows, _ = _assemble_directional_site_energy(
+        manager, next_payload, for_power=for_power
+    )
+    if corrected and not for_power:
         assert not flows.keys() & keys
     else:
-        assert flows["battery_energy_from_grid"].value_kwh == 3.452
+        assert flows["battery_energy_from_grid"].value_kwh == (
+            3.352 if corrected else 3.452
+        )
         assert flows["battery_energy_to_grid"].value_kwh == 0.1
+        if corrected:
+            # Later valid updates in the new day also qualify for power.
+            next_payload.update(
+                last_report_date=1_700_086_701,
+                grid_battery=[None, 2750, latest_grid, 550],
+                charge=[None, 3510, 522, 600],
+            )
+            current = manager._parse_site_energy_timestamp(
+                next_payload["last_report_date"], require_time=True
+            )
+            assert manager._directional_battery_totals(
+                next_payload, current, for_power=True
+            )
+
+
+def test_directional_power_rejects_redistribution_between_closed_buckets(
+    coordinator_factory, directional_battery_payload
+):
+    manager = coordinator_factory().energy
+    payload = {
+        **directional_battery_payload,
+        "grid_battery": [100, 200, 300],
+        "solar_battery": [0, 0, 0],
+        "charge": [100, 200, 300],
+        "battery_home": [0, 0, 0],
+        "battery_grid": [0, 0, 0],
+        "discharge": [0, 0, 0],
+    }
+    source = manager._parse_site_energy_timestamp(
+        payload["last_report_date"], require_time=True
+    )
+    assert source is not None
+    assert manager._directional_battery_totals(payload, source, for_power=True)
+    assert manager._directional_battery_totals(payload, source)
+
+    changed = {**payload, "grid_battery": [110, 190, 350], "charge": [110, 190, 350]}
+    later = source + timedelta(minutes=5)
+    assert not manager._directional_battery_totals(changed, later, for_power=True)
+    assert not manager._directional_battery_totals(changed, later, for_power=True)
+    assert manager._directional_battery_totals(
+        changed, later + timedelta(minutes=5), for_power=True
+    )
+    assert manager._directional_battery_totals(changed, later)
+
+
+@pytest.mark.parametrize("closed_bucket", [False, True])
+def test_directional_power_rejects_closed_or_same_clock_revision(
+    coordinator_factory, directional_battery_payload, closed_bucket
+):
+    manager = coordinator_factory().energy
+    source = manager._parse_site_energy_timestamp(
+        directional_battery_payload["last_report_date"], require_time=True
+    )
+    assert source is not None
+    assert manager._directional_battery_totals(
+        directional_battery_payload, source, for_power=True
+    )
+    if closed_bucket:
+        revision = {
+            "grid_battery": [None, 2650, 202],
+            "solar_battery": [None, 850, 320],
+        }
+        source += timedelta(minutes=5)
+    else:
+        revision = {
+            "grid_battery": [None, 2750, 102],
+            "solar_battery": [None, 750, 420],
+        }
+    assert not manager._directional_battery_totals(
+        {**directional_battery_payload, **revision}, source, for_power=True
+    )
+    assert manager._directional_battery_totals(
+        directional_battery_payload, source + timedelta(minutes=5), for_power=True
+    )
 
 
 @pytest.mark.parametrize(
@@ -647,6 +732,7 @@ def test_directional_battery_rejects_overflowing_total(coordinator_factory) -> N
         {"closed": {"grid_battery": True}},
         {"closed": dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), 10_000)},
         {"totals": dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), 0)},
+        {"totals": dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), 10**400)},
         [],
     ],
 )
@@ -4170,25 +4256,12 @@ def test_site_grid_power_reseeds_when_cumulative_source_changes(
     assert sensor.extra_state_attributes["method"] == "lifetime_energy_window"
 
 
-def test_site_lifetime_power_plausibility_helper_handles_bad_scale_values(
-    coordinator_factory,
-) -> None:
-    coord = coordinator_factory()
-    sensor = EnphaseGridPowerSensor(coord)
-
+def test_site_lifetime_power_plausibility_helper_handles_bad_scale_values() -> None:
     class BadFloat:
         def __float__(self):
             raise ValueError("boom")
 
-    assert (
-        sensor._power_sample_is_plausible(
-            power_w=120000,
-            signed_delta_kwh=10.0,
-            current_values={"grid_import": BadFloat()},
-            previous_values={},
-        )
-        is True
-    )
+    assert site_power_sample_is_plausible(120000, 10.0, (BadFloat(),)) is True
 
 
 def test_site_lifetime_power_normalizes_dict_flow_source_signatures(

@@ -800,7 +800,7 @@
               "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig. Standard: Fra laderens telemetri når den er tilgjengelig; ellers basert på Home Assistant-regionen, med en reserveverdi på 230 V.",
               "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger. Standard: Aktivert.",
               "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery. Standard: Aktivert.",
-              "directional_battery_energy_enabled": "Viser akkumulert energi fra strømnettet og solcellene til batteriet og fra batteriet til hjemmet og strømnettet i energidashbordet. Standard: aktivert.",
+              "directional_battery_energy_enabled": "Viser akkumulert energi fra strømnettet og solcellene til batteriet og fra batteriet til hjemmet og strømnettet i energidashbordet. Viser også effektanslag fra skydata når de er verifisert. Standard: aktivert.",
               "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter. Standard: Deaktivert.",
               "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard. Standard: Deaktivert."
             }
@@ -842,7 +842,7 @@
           "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig. Standard: Fra laderens telemetri når den er tilgjengelig; ellers basert på Home Assistant-regionen, med en reserveverdi på 230 V.",
           "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger. Standard: Aktivert.",
           "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery. Standard: Aktivert.",
-          "directional_battery_energy_enabled": "Viser akkumulert energi fra strømnettet og solcellene til batteriet og fra batteriet til hjemmet og strømnettet i energidashbordet. Standard: aktivert.",
+          "directional_battery_energy_enabled": "Viser akkumulert energi fra strømnettet og solcellene til batteriet og fra batteriet til hjemmet og strømnettet i energidashbordet. Viser også effektanslag fra skydata når de er verifisert. Standard: aktivert.",
           "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter. Standard: Deaktivert.",
           "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig. Krever installatørtilgang. Standard: Deaktivert.",
           "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard. Standard: Deaktivert.",
@@ -1473,6 +1473,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Målt kl. (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Effekt fra strømnettet til batteriet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Målt kl. (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Siste vindu (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Effekt fra solcellene til batteriet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Målt kl. (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Siste vindu (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Effekt fra batteriet til hjemmet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Målt kl. (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Siste vindu (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Effekt fra batteriet til strømnettet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Målt kl. (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Siste vindu (s)"
           }
         }
       },

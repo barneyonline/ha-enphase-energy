@@ -40,7 +40,8 @@ class EnergyPowerAverage:
     deferred until the next advancing observation by the caller.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, wh_per_unit: int = 1000) -> None:
+        self._watt_seconds_per_unit = wh_per_unit * 3600
         self.samples: list[tuple[float, float]] = []
         self.clock: str | None = None
         self._latest: AverageUpdate | None = None
@@ -139,8 +140,8 @@ class EnergyPowerAverage:
         self._accepted = AverageUpdate(watts, seconds, method)
         return self._result(self._accepted)
 
-    def add(self, timestamp: float, energy_kwh: float, clock: str) -> None:
-        if not math.isfinite(timestamp) or not math.isfinite(energy_kwh):
+    def add(self, timestamp: float, energy: float, clock: str) -> None:
+        if not math.isfinite(timestamp) or not math.isfinite(energy):
             return
         if self.samples and timestamp <= self.samples[-1][0]:
             return
@@ -149,7 +150,7 @@ class EnergyPowerAverage:
         ):
             self.clear()
         self.clock = clock
-        self.samples.append((timestamp, energy_kwh))
+        self.samples.append((timestamp, energy))
         # Retain the bracketing observation, not just points inside the window.
         while (
             len(self.samples) > 2 and self.samples[1][0] <= timestamp - WINDOW_SECONDS
@@ -169,7 +170,7 @@ class EnergyPowerAverage:
             next_ts, next_energy = self.samples[1]
             baseline += (next_energy - baseline) * (left - start) / (next_ts - start)
         seconds = end - left
-        watts = (energy - baseline) * 3_600_000 / seconds
+        watts = (energy - baseline) * self._watt_seconds_per_unit / seconds
         return (round(watts), seconds) if math.isfinite(watts) else None
 
     def as_dict(self) -> dict[str, Any]:

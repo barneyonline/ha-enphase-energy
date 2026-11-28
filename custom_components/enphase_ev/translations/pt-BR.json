@@ -800,7 +800,7 @@
               "nominal_voltage": "Tensão de alimentação CA típica usada para estimar a potência quando a tensão em tempo real não está disponível. Padrão: Obtido da telemetria do carregador quando disponível; caso contrário, conforme a região do Home Assistant, com valor alternativo de 230 V.",
               "schedule_sync_enabled": "Gerencie os agendamentos do IQ EV Charger. Padrão: Ativado.",
               "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery. Padrão: Ativado.",
-              "directional_battery_energy_enabled": "Mostra no painel de energia os totais acumulados da rede e dos painéis solares para a bateria e da bateria para a casa e a rede. Ativado por padrão.",
+              "directional_battery_energy_enabled": "Mostra no painel de energia os totais acumulados da rede e dos painéis solares para a bateria e da bateria para a casa e a rede. Inclui estimativas de potência baseadas em dados da nuvem quando verificadas. Ativado por padrão.",
               "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor. Padrão: Desativado.",
               "vpp_events_enabled": "Obtém as programações VPP/ELRP da Enphase e cria entidades de evento somente para locais inscritos. Desativado por padrão. Padrão: Desativado."
             }
@@ -842,7 +842,7 @@
           "nominal_voltage": "Tensão de alimentação CA típica usada para estimar a potência quando a tensão em tempo real não está disponível. Padrão: Obtido da telemetria do carregador quando disponível; caso contrário, conforme a região do Home Assistant, com valor alternativo de 230 V.",
           "schedule_sync_enabled": "Gerencie os agendamentos do IQ EV Charger. Padrão: Ativado.",
           "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery. Padrão: Ativado.",
-          "directional_battery_energy_enabled": "Mostra no painel de energia os totais acumulados da rede e dos painéis solares para a bateria e da bateria para a casa e a rede. Ativado por padrão.",
+          "directional_battery_energy_enabled": "Mostra no painel de energia os totais acumulados da rede e dos painéis solares para a bateria e da bateria para a casa e a rede. Inclui estimativas de potência baseadas em dados da nuvem quando verificadas. Ativado por padrão.",
           "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor. Padrão: Desativado.",
           "microinverter_power_enabled": "Ativa todos os sensores de potência de cada microinversor quando a telemetria do instalador está disponível. Requer acesso de instalador. Padrão: Desativado.",
           "vpp_events_enabled": "Obtém as programações VPP/ELRP da Enphase e cria entidades de evento somente para locais inscritos. Desativado por padrão. Padrão: Desativado.",
@@ -1473,6 +1473,50 @@
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Amostrado em (UTC)"
+          }
+        }
+      },
+      "battery_power_from_grid": {
+        "name": "Potência da rede para a bateria",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Amostrado em (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Última janela (s)"
+          }
+        }
+      },
+      "battery_power_from_solar": {
+        "name": "Potência solar para a bateria",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Amostrado em (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Última janela (s)"
+          }
+        }
+      },
+      "battery_power_to_home": {
+        "name": "Potência da bateria para a casa",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Amostrado em (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Última janela (s)"
+          }
+        }
+      },
+      "battery_power_to_grid": {
+        "name": "Potência da bateria para a rede",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Amostrado em (UTC)"
+          },
+          "last_window_seconds": {
+            "name": "Última janela (s)"
           }
         }
       },

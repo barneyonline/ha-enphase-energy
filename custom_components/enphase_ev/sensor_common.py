@@ -11,6 +11,7 @@ from homeassistant.core import callback as ha_callback
 from . import sensor_battery_helpers as _battery_helpers
 from .coordinator import EnphaseCoordinator
 from .labels import friendly_status_text, status_label
+from .power_validation import _energy_delta_to_power_w as _energy_delta_to_power_w
 
 _CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
 
@@ -56,23 +57,6 @@ def _resolve_lifetime_power_window(
     else:
         window_s = default_window_s
     return window_s if window_s > 0 else default_window_s
-
-
-def _energy_delta_to_power_w(
-    delta_kwh: float,
-    *,
-    window_s: float,
-    floor_zero: bool = False,
-    max_watts: float | None = None,
-) -> int:
-    """Convert an energy delta over a window into watts."""
-
-    watts = (delta_kwh * 3_600_000.0) / window_s
-    if floor_zero and watts < 0:
-        watts = 0
-    if max_watts is not None and watts > max_watts:
-        watts = max_watts
-    return int(round(watts))
 
 
 def _restore_optional_float_attribute(

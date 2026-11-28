@@ -2,12 +2,58 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 import math
 
+SITE_POWER_OUTLIER_MIN_W = 100_000
+SITE_POWER_OUTLIER_MIN_KWH = 5.0
+SITE_POWER_OUTLIER_FLOW_RATIO = 0.15
 EXTREME_SITE_POWER_W = 1_000_000.0
 EXTREME_CONFIRM_MIN_RATIO = 0.5
 EXTREME_CONFIRM_MAX_RATIO = 2.0
+
+
+def _energy_delta_to_power_w(
+    delta_energy: float,
+    *,
+    window_s: float,
+    floor_zero: bool = False,
+    max_watts: float | None = None,
+    wh_per_unit: int = 1000,
+) -> int:
+    """Convert an energy delta over a window into watts."""
+    watts = (delta_energy * (wh_per_unit * 3600.0)) / window_s
+    if floor_zero and watts < 0:
+        watts = 0
+    if max_watts is not None and watts > max_watts:
+        watts = max_watts
+    return int(round(watts))
+
+
+def site_power_sample_is_plausible(
+    power_w: int, signed_delta_kwh: float, flow_values_kwh: Iterable[float]
+) -> bool:
+    """Reject corrupt cumulative deltas while allowing large sites."""
+    abs_delta_kwh = abs(signed_delta_kwh)
+    if (
+        abs(power_w) < SITE_POWER_OUTLIER_MIN_W
+        or abs_delta_kwh < SITE_POWER_OUTLIER_MIN_KWH
+    ):
+        return True
+
+    flow_scale_kwh = 0.0
+    for value in flow_values_kwh:
+        try:
+            numeric = abs(float(value))
+        except Exception:
+            continue
+        flow_scale_kwh = max(flow_scale_kwh, numeric)
+
+    return (
+        flow_scale_kwh <= 0
+        or abs_delta_kwh < flow_scale_kwh * SITE_POWER_OUTLIER_FLOW_RATIO
+    )
 
 
 @dataclass(frozen=True, slots=True)

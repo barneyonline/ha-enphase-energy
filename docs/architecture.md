@@ -674,6 +674,33 @@ Recorder also retains its statistics. The IQ Battery sensors retain Wh precision
 The Device Features option controls whether the platform adds the sensors.
 Home Assistant retains the registry entries and their original enablement settings.
 
+Directional battery power shares the lifetime read and validates it against an
+in-memory source history. The calculator checks all four source-precision
+partial-day counters against the direct charge and discharge deltas for the
+same report window. A reconciled revision of the current battery bucket on an
+advancing source clock clears both power estimates and seeds a fresh baseline.
+The next estimate uses only a complete, reconciled window after the revision.
+The power baseline is independent of the saved cumulative energy baseline.
+Missing, stale, or inconsistent data break the group's calculation history.
+Corrections to closed history need confirmation at an advancing report
+timestamp before power can seed again. Same-clock revisions break the window.
+Each charge and discharge pair tracks its last independently reconciled,
+plausible report and its timestamp. If a direction and its direct aggregate
+fall below that report, the group waits for a reconciled recovery to its
+pre-drop levels before reseeding. An implausible advance or an unmatched
+increase keeps the original time allowance while the pair waits for a
+reconciled, plausible report. This check uses the same five-minute minimum
+window as the estimator. A fresh report with unusable counters can preserve
+that time allowance through a reload without contributing any raw counters
+or watts.
+Site-local day rollover seeds a new power baseline even if the closing bucket
+was revised. The group's qualification and both power readings participate in
+coordinator snapshot equality. Each entity uses the group's source timestamp
+for freshness. Reloads use saved raw counters and a checksum of closed history
+to detect a dropout or revision. The group publishes after storage acknowledges
+the checkpoint and the refresh is still current. Entity registration is gated
+pending [short-window source validation](api/directional_battery_power.md).
+
 Current Grid Power and Current Battery Power reseed their cumulative-energy
 baselines when missing source channels return, including during reload or reauth.
 Synthetic zero placeholders never authorize a delta from zero to a lifetime total.
@@ -718,14 +745,16 @@ fallback's calculation method while those watts remain eligible. An advancing
 rejected interval cannot validate fallback watts loaded privately at restart.
 Independently accepted
 restore history remains eligible until its original deadline. Calculation and
-freshness clocks remain separate. Other power entities and cumulative energy
-sensors do not use this option. Changing the option reloads the integration.
-Private restore data tags the mode so cached watts and baselines from the other
-mode cannot be reused. Same-mode
-restore retains the bounded averaging buffer without extending accepted expiry.
-Averaging validates its final watts independently of the consecutive interval
-calculation, including the consumption-energy fallback. An extreme average
-requires a comparable, independently measured increment in the next interval.
+freshness clocks remain separate. The four directional battery power estimates
+also use this option. Changing the option reloads the integration.
+Aggregate site power tags its private restore data with the averaging mode.
+When the mode matches, restore retains the bounded averaging buffer and its
+original expiry. Directional estimates build a fresh averaging window on
+reload.
+For aggregate site power, averaging validates its final watts independently of
+the consecutive interval calculation, including consumption-energy fallback.
+An extreme average requires a comparable, independently measured increment
+in the next interval.
 That interval starts a new rolling window, so a single suspect increment cannot
 confirm itself or affect later averages. Duplicate reports preserve quarantine
 and the last accepted average and its freshness. Restored buffers reject invalid clock types, overflowing numbers, and unsafe averages.
