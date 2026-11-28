@@ -39,7 +39,7 @@ class AcknowledgedStore(Store[dict[str, Any]]):  # type: ignore[misc]
             # Core may defer a save until final_write during shutdown.
             await self._async_handle_write_data()
         if not self._written:
-            raise OSError(f"Storage write for {self.key} was not acknowledged")
+            raise OSError("Storage write was not acknowledged")
 
     async def _async_write_data(self, data: dict[str, Any]) -> None:
         try:

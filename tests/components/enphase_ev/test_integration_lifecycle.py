@@ -29,7 +29,7 @@ from pytest_homeassistant.common import MockConfigEntry, async_fire_time_changed
 from yarl import URL
 
 from custom_components.enphase_ev.api import EnphaseEVClient
-from custom_components.enphase_ev.api_client import evse_surface
+from custom_components.enphase_ev.api_client import common as api_common, evse_surface
 from custom_components.enphase_ev.const import (
     CONF_EAUTH,
     CONF_HEMS_AUTH_FAILURE_COUNT,
@@ -209,10 +209,20 @@ async def test_directional_battery_real_platform_lifecycle(
 ):
     responses, _, unexpected = platform_cloud
     _configure_directional_battery_site(hass, config_entry, responses)
+    read_lifetime = EnphaseEVClient.lifetime_energy
+    optional_scopes = []
+
+    async def track_lifetime_scope(client):
+        optional_scopes.append(api_common._enlighten_optional_read.get())
+        return await read_lifetime(client)
+
+    monkeypatch.setattr(EnphaseEVClient, "lifetime_energy", track_lifetime_scope)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await _finish_startup(hass, config_entry)
     registry = er.async_get(hass)
     coord = config_entry.runtime_data.coordinator
+    assert len(optional_scopes) >= 2 and all(optional_scopes)
+    assert "directional_battery_energy_s" in coord._warmup_phase_timings
     ids = {
         key: registry.async_get_entity_id(
             "sensor", DOMAIN, f"{DOMAIN}_site_{coord.site_id}_{key}"

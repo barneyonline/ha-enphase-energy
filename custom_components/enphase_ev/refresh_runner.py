@@ -25,9 +25,9 @@ from .api import (
 from .const import DOMAIN, DEFAULT_CHARGE_LEVEL_SETTING, PHASE_SWITCH_CONFIG_SETTING
 from .log_redaction import redact_site_id, redact_text
 from .refresh_plan import (
+    DIRECTIONAL_BATTERY_WARMUP_PLAN,
     STARTUP_CURRENT_POWER_PLAN,
     STARTUP_POWER_PLAN,
-    WARMUP_STAGE_DEADLINE_S,
     BoundRefreshCall,
     RefreshPlan,
     bind_refresh_plan,
@@ -474,8 +474,9 @@ class RefreshRunner:
                 None,
             )
             if callable(context_refresh_due) and context_refresh_due():
-                async with asyncio.timeout(WARMUP_STAGE_DEADLINE_S):
-                    await self.async_refresh_site_energy_for_warmup()
+                await self.async_run_refresh_plan(
+                    warmup_timings, plan=DIRECTIONAL_BATTERY_WARMUP_PLAN
+                )
                 if coordinator.runtime_active:
                     publish_stage()
         except asyncio.CancelledError:
