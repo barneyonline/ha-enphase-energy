@@ -91,6 +91,7 @@ from custom_components.enphase_ev.const import (
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
     OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+    OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
     OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
@@ -3774,6 +3775,10 @@ async def test_options_flow_devices_form_with_defaults(hass) -> None:
         validated[CONF_DEVICE_FEATURES_SECTION][OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED]
         is True
     )
+    assert (
+        validated[CONF_DEVICE_FEATURES_SECTION][OPT_DIRECTIONAL_BATTERY_POWER_ENABLED]
+        is False
+    )
     assert features[OPT_PRICING_EDITS_ENABLED] is DEFAULT_PRICING_EDITS_ENABLED
     assert features[OPT_WEATHER_ENABLED] is DEFAULT_WEATHER_ENABLED
     assert features[OPT_EXPORT_LIMIT_CONTROLS_ENABLED] is False
@@ -4370,6 +4375,7 @@ async def test_options_flow_updates_selected_device_categories_in_data(hass) -> 
                 OPT_SCHEDULE_SYNC_ENABLED: False,
                 OPT_BATTERY_SCHEDULES_ENABLED: True,
                 OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: False,
+                OPT_DIRECTIONAL_BATTERY_POWER_ENABLED: True,
                 OPT_WEATHER_ENABLED: True,
                 OPT_NOMINAL_VOLTAGE: 240,
             },
@@ -4382,6 +4388,16 @@ async def test_options_flow_updates_selected_device_categories_in_data(hass) -> 
     assert result["data"][OPT_MICROINVERTER_POWER_ENABLED] is True
     assert result["data"][OPT_GRID_PROFILE_CONTROLS_ENABLED] is True
     assert result["data"][OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED] is False
+    assert result["data"][OPT_DIRECTIONAL_BATTERY_POWER_ENABLED] is True
+    assert (
+        await handler.async_step_features(
+            {
+                CONF_DEVICE_FEATURES_SECTION: {
+                    OPT_DIRECTIONAL_BATTERY_POWER_ENABLED: False
+                }
+            }
+        )
+    )["data"][OPT_DIRECTIONAL_BATTERY_POWER_ENABLED] is False
     assert result["data"][OPT_NOMINAL_VOLTAGE] == 240
     assert entry.data[CONF_SELECTED_TYPE_KEYS] == ["envoy", "encharge"]
 

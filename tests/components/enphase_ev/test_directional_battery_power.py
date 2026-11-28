@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from custom_components.enphase_ev import coordinator as coord_mod
 from custom_components.enphase_ev import energy as energy_mod
 from custom_components.enphase_ev.directional_battery_energy import (
     DirectionalBatteryPairReference,
@@ -149,7 +150,7 @@ def test_replay_recorded_partial_day_window(replay):
 async def test_power_reseeds_after_revision_without_rebasing_lifetime_energy(
     coordinator_factory, monkeypatch
 ):
-    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    monkeypatch.setattr(coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", True)
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()
@@ -190,25 +191,31 @@ async def test_power_reseeds_after_revision_without_rebasing_lifetime_energy(
     assert power.average == power.interval
 
 
-@pytest.mark.parametrize("superseded", [False, True])
+@pytest.mark.parametrize(
+    "outcome", ["power_failure", "power_superseded", "energy_superseded"]
+)
 async def test_interrupted_lifetime_save_breaks_the_power_window(
-    coordinator_factory, monkeypatch, superseded
+    coordinator_factory, monkeypatch, outcome
 ):
-    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    monkeypatch.setattr(coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", True)
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()
     manager = coordinator_factory(client=SimpleNamespace(lifetime_energy=read)).energy
 
-    async def save_history(power_wh):
+    async def save_history(*_checkpoint):
         if now == _START + timedelta(minutes=15):
-            if superseded:
+            if outcome.endswith("_superseded"):
                 manager._invalidate_site_energy_cache()
                 return True
             return False
         return True
 
-    monkeypatch.setattr(manager._directional_battery, "async_save", save_history)
+    monkeypatch.setattr(
+        manager._directional_battery,
+        "async_save" if outcome == "energy_superseded" else "async_save_power",
+        save_history,
+    )
     power = manager.directional_battery_power
 
     async def refresh(grid):
@@ -248,7 +255,7 @@ async def test_power_publication_waits_for_storage_ack(
     coordinator_factory, monkeypatch, save_result, power_enabled
 ):
     monkeypatch.setattr(
-        energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", power_enabled
+        coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", power_enabled
     )
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
@@ -258,14 +265,18 @@ async def test_power_publication_waits_for_storage_ack(
     saving = asyncio.Event()
     finish_save = asyncio.Event()
 
-    async def save_history(_power_wh):
+    async def save_history(*_checkpoint):
         if now == _START:
             return True
         saving.set()
         await finish_save.wait()
         return save_result != "failure"
 
-    monkeypatch.setattr(manager._directional_battery, "async_save", save_history)
+    monkeypatch.setattr(
+        manager._directional_battery,
+        "async_save_power" if power_enabled else "async_save",
+        save_history,
+    )
 
     def payload(grid):
         return {
@@ -585,13 +596,21 @@ def test_dropout_recovery_compares_paired_and_direct_deltas(replay):
     [
         "legacy",
         "corrupt_checkpoint",
+        "invalid_signature_size",
+        "invalid_signature_count",
+        "invalid_observations",
+        "too_many_observations",
+        "invalid_observation_signature",
+        "invalid_cumulative_signature",
         "invalid_pair",
+        "invalid_aggregate_floor",
         "future_pair_clock",
         "numeric_clock",
         "bad_clock",
         "future_clock",
         "naive_clock",
         "power",
+        "embedded_checkpoint",
         "closed_revision",
         "revision_during_reload",
         "routing_revision",
@@ -616,18 +635,30 @@ def test_dropout_recovery_compares_paired_and_direct_deltas(replay):
 async def test_reload_during_dropout_uses_saved_same_day_counters(
     coordinator_factory, monkeypatch, history_kind
 ):
-    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    monkeypatch.setattr(coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", True)
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()
-    saved = None
+    saved = {}
+    embedded_checkpoint = None
 
     async def load_history():
-        return saved
+        return saved or None
 
     async def save_history(history):
         nonlocal saved
+        if "power" in history:
+            assert history["power"] == embedded_checkpoint
         saved = history
+
+    saved_power = None
+
+    async def load_power():
+        return saved_power
+
+    async def save_power(checkpoint):
+        nonlocal saved_power
+        saved_power = checkpoint
 
     def new_manager():
         manager = coordinator_factory(
@@ -637,6 +668,10 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
             async_load=load_history, async_save=save_history
         )
         manager._directional_battery._loaded = False
+        manager._directional_battery._power_store = SimpleNamespace(
+            async_load=load_power, async_save=save_power
+        )
+        manager._directional_battery._power_loaded = False
         return manager
 
     manager = new_manager()
@@ -700,23 +735,44 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         "invalid_after_legacy_reload",
         "legacy_at_saved_clock",
     ):
-        del saved["power"]
+        saved_power = None
+    elif history_kind == "embedded_checkpoint":
+        embedded_checkpoint = saved_power
+        del embedded_checkpoint["closed_signature_size"]
+        del embedded_checkpoint["observed_signatures"]
+        del embedded_checkpoint["cumulative_signature"]
+        saved["power"] = embedded_checkpoint
+        saved_power = None
     elif history_kind == "corrupt_checkpoint":
-        del saved["power"]["pairs"]["charge"]["wh"]["grid_battery"]
+        del saved_power["pairs"]["charge"]["wh"]["grid_battery"]
+    elif history_kind == "invalid_signature_size":
+        saved_power["closed_signature_size"] = "2"
+    elif history_kind == "invalid_signature_count":
+        saved_power["closed_signature_size"] = saved_power["size"] + 1
+    elif history_kind == "invalid_observations":
+        saved_power["observed_signatures"] = "invalid"
+    elif history_kind == "too_many_observations":
+        saved_power["observed_signatures"] *= 301
+    elif history_kind == "invalid_observation_signature":
+        saved_power["observed_signatures"] = ["invalid"]
+    elif history_kind == "invalid_cumulative_signature":
+        saved_power["cumulative_signature"] = "invalid"
     elif history_kind == "invalid_pair":
-        saved["power"]["pairs"]["charge"] = []
+        saved_power["pairs"]["charge"] = []
+    elif history_kind == "invalid_aggregate_floor":
+        saved_power["pairs"]["charge"].update(held=True, aggregate_floor_wh=-1)
     elif history_kind == "future_pair_clock":
-        saved["power"]["pairs"]["charge"]["reported_at"] = (
+        saved_power["pairs"]["charge"]["reported_at"] = (
             _START + timedelta(minutes=10)
         ).isoformat()
     elif history_kind == "numeric_clock":
-        saved["power"]["reported_at"] = 1e300
+        saved_power["reported_at"] = 1e300
     elif history_kind == "bad_clock":
-        saved["power"]["reported_at"] = "1e300"
+        saved_power["reported_at"] = "1e300"
     elif history_kind == "future_clock":
-        saved["power"]["reported_at"] = "9999-12-31T08:00:00+00:00"
+        saved_power["reported_at"] = "9999-12-31T08:00:00+00:00"
     elif history_kind == "naive_clock":
-        saved["power"]["reported_at"] = "2026-09-05T12:05:00"
+        saved_power["reported_at"] = "2026-09-05T12:05:00"
     elif history_kind in ("known_hold", "hold_clock", "origin_shift"):
         assert await refresh(600, 0) is None
         assert await refresh(900, 0) is None
@@ -760,7 +816,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         else:
             assert await refresh(600, 1050) is None
         if history_kind == "invalid_after_legacy_reload":
-            assert saved["power"]["closed_signature"] is None
+            assert saved_power["closed_signature"] is None
         if history_kind in ("invalid_before_reload", "invalid_after_legacy_reload"):
             manager = new_manager()
         assert await refresh(900, 11050) is None
@@ -798,7 +854,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
     if history_kind == "origin_shift":
         assert await refresh(86400, 10, source_start="missing") is None
         assert await refresh(86700, 10, source_start="shifted") is None
-        assert saved["power"]["start"] == _START.date().isoformat()
+        assert saved_power["start"] == _START.date().isoformat()
         assert (await refresh(87000, 60, source_start="shifted")).watts[
             "grid_battery"
         ] == 600
@@ -843,8 +899,8 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         return
     latest_clock = 1200 if history_kind == "closed_revision" else 300
     assert await refresh(150, 1000, receipt_seconds=latest_clock + 1) is None
-    if history_kind in ("power", "legacy"):
-        grid = 1000 if history_kind == "power" else 1050
+    if history_kind in ("power", "embedded_checkpoint", "legacy"):
+        grid = 1050 if history_kind == "legacy" else 1000
         assert await refresh(300, grid, receipt_seconds=latest_clock + 2) is None
     if history_kind == "revision_during_reload":
         closed_grid = 450
@@ -856,7 +912,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         # This clock is newer than the cumulative baseline and older than the
         # last power checkpoint. It must not lower the restart guard.
         assert await refresh(1050, 850, receipt_seconds=latest_clock + 2) is None
-        assert saved["power"]["pairs"]["charge"]["wh"]["grid_battery"] == 1300
+        assert saved_power["pairs"]["charge"]["wh"]["grid_battery"] == 1300
     recovery = 1300 if history_kind == "closed_revision" else 1050
     for seconds, grid in (
         (1500, 0),
@@ -866,13 +922,16 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
     ):
         assert await refresh(seconds, grid) is None
     assert (await refresh(2700, recovery + 50)).watts["grid_battery"] == 600
+    if history_kind == "embedded_checkpoint":
+        assert "power" not in saved
+        assert saved_power["observed_signatures"]
 
 
 @pytest.mark.parametrize("regressed", [False, True])
 async def test_closed_day_revision_waits_for_confirmation_then_seeds_power(
     coordinator_factory, monkeypatch, regressed
 ):
-    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    monkeypatch.setattr(coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", True)
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()

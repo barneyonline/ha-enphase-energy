@@ -77,6 +77,7 @@ from custom_components.enphase_ev.const import (
     OPT_API_TIMEOUT,
     OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
     OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+    OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_WEATHER_ENABLED,
     OPT_VPP_EVENTS_ENABLED,
@@ -5939,6 +5940,7 @@ def test_service_registration_is_idempotent(hass):
         "export_limit_controls_enabled",
         OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
         OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+        OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
     ],
 )
 async def test_feature_toggle_reloads_runtime(
@@ -5971,6 +5973,8 @@ async def test_feature_toggle_reloads_runtime(
         ({OPT_DESCRIPTIVE_ACTIVITY_ENTRIES: False}, {}),
         ({}, {OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: True}),
         ({OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: True}, {}),
+        ({}, {OPT_DIRECTIONAL_BATTERY_POWER_ENABLED: False}),
+        ({OPT_DIRECTIONAL_BATTERY_POWER_ENABLED: False}, {}),
     ],
 )
 async def test_feature_default_normalization_does_not_reload(
