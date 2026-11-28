@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from custom_components.enphase_ev import coordinator as coord_mod
 from custom_components.enphase_ev import energy as energy_mod
 from custom_components.enphase_ev.directional_battery_energy import (
     DirectionalBatteryPairReference,
@@ -149,7 +150,7 @@ def test_replay_recorded_partial_day_window(replay):
 async def test_power_reseeds_after_revision_without_rebasing_lifetime_energy(
     coordinator_factory, monkeypatch
 ):
-    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    monkeypatch.setattr(coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", True)
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()
@@ -194,7 +195,7 @@ async def test_power_reseeds_after_revision_without_rebasing_lifetime_energy(
 async def test_interrupted_lifetime_save_breaks_the_power_window(
     coordinator_factory, monkeypatch, superseded
 ):
-    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    monkeypatch.setattr(coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", True)
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()
@@ -248,7 +249,7 @@ async def test_power_publication_waits_for_storage_ack(
     coordinator_factory, monkeypatch, save_result, power_enabled
 ):
     monkeypatch.setattr(
-        energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", power_enabled
+        coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", power_enabled
     )
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
@@ -616,7 +617,7 @@ def test_dropout_recovery_compares_paired_and_direct_deltas(replay):
 async def test_reload_during_dropout_uses_saved_same_day_counters(
     coordinator_factory, monkeypatch, history_kind
 ):
-    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    monkeypatch.setattr(coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", True)
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()
@@ -872,7 +873,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
 async def test_closed_day_revision_waits_for_confirmation_then_seeds_power(
     coordinator_factory, monkeypatch, regressed
 ):
-    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    monkeypatch.setattr(coord_mod, "DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED", True)
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()

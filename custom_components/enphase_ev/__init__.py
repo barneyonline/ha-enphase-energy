@@ -29,10 +29,12 @@ from .const import (
     CONF_SITE_ONLY,
     DOMAIN,
     DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+    DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED,
     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
     DEFAULT_DESCRIPTIVE_ACTIVITY_ENTRIES,
     OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
     OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+    OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
     OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
@@ -122,6 +124,7 @@ _RELOAD_REQUIRED_OPTION_KEYS = frozenset(
         OPT_USE_15_MINUTE_POWER_AVERAGE,
         OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
         OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+        OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
         OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
         OPT_GRID_PROFILE_CONTROLS_ENABLED,
         OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
@@ -349,18 +352,20 @@ async def _async_update_listener_locked(
                 )
             ):
                 changed_reload_options.discard(OPT_DESCRIPTIVE_ACTIVITY_ENTRIES)
-            if bool(
-                previous_options.get(
+            for key, default in (
+                (
                     OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
                     DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
-                )
-            ) == bool(
-                target_options.get(
-                    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
-                    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
-                )
+                ),
+                (
+                    OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
+                    DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED,
+                ),
             ):
-                changed_reload_options.discard(OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED)
+                if bool(previous_options.get(key, default)) == bool(
+                    target_options.get(key, default)
+                ):
+                    changed_reload_options.discard(key)
             reload_required = bool(
                 changed_data_keys - _HOT_APPLY_DATA_KEYS or changed_reload_options
             )

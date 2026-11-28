@@ -42,6 +42,7 @@ from custom_components.enphase_ev.const import (
     DOMAIN,
     ISSUE_BATTERY_PROFILE_PENDING,
     OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+    OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_USE_15_MINUTE_POWER_AVERAGE,
     OPT_WEATHER_ENABLED,
@@ -211,16 +212,13 @@ def _configure_directional_battery_site(hass, config_entry, responses):
 
 @pytest.mark.session_history_real
 async def test_directional_battery_power_publishes_same_cursor_invalidation(
-    hass, config_entry, platform_cloud, freezer, monkeypatch
+    hass, config_entry, platform_cloud, freezer
 ):
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.energy.DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED",
-        True,
-    )
     responses, calls, _unexpected = platform_cloud
     _configure_directional_battery_site(hass, config_entry, responses)
     hass.config_entries.async_update_entry(
         config_entry,
+        options={OPT_DIRECTIONAL_BATTERY_POWER_ENABLED: True},
         data={
             **config_entry.data,
             CONF_SERIALS: [RANDOM_SERIAL],
@@ -274,23 +272,22 @@ async def test_directional_battery_power_publishes_same_cursor_invalidation(
 
 
 @pytest.mark.session_history_real
-@pytest.mark.parametrize("source_validated", [False, True])
+@pytest.mark.parametrize("power_enabled", [False, True])
 async def test_directional_battery_power_platform_lifecycle(
     hass,
     config_entry,
     platform_cloud,
     freezer,
-    monkeypatch,
-    source_validated,
+    power_enabled,
     tmp_path,
 ):
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.energy.DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED",
-        source_validated,
-    )
     responses, calls, unexpected = platform_cloud
     _configure_directional_battery_site(hass, config_entry, responses)
-    dashboard_supported = source_validated and hasattr(
+    if power_enabled:
+        hass.config_entries.async_update_entry(
+            config_entry, options={OPT_DIRECTIONAL_BATTERY_POWER_ENABLED: True}
+        )
+    dashboard_supported = power_enabled and hasattr(
         ha_energy, "BATTERY_POWER_CONFIG_SCHEMA"
     )
     if dashboard_supported:
@@ -341,7 +338,7 @@ async def test_directional_battery_power_platform_lifecycle(
     await publish(force=False)
     assert calls["lifetime_energy"].await_count == lifetime_reads + 1
     ids = entity_ids(DIRECTIONAL_BATTERY_POWER_FIELDS)
-    if not source_validated:
+    if not power_enabled:
         assert set(ids.values()) == {None}
         assert (
             float(hass.states.get(energy_ids["battery_energy_from_grid"]).state) == 12
@@ -423,7 +420,11 @@ async def test_directional_battery_power_platform_lifecycle(
 
     # Options reload the manager and keep the four stable registry IDs.
     hass.config_entries.async_update_entry(
-        config_entry, options={OPT_USE_15_MINUTE_POWER_AVERAGE: True}
+        config_entry,
+        options={
+            OPT_USE_15_MINUTE_POWER_AVERAGE: True,
+            OPT_DIRECTIONAL_BATTERY_POWER_ENABLED: True,
+        },
     )
     await _finish_startup(hass, config_entry)
     coord = config_entry.runtime_data.coordinator
@@ -437,7 +438,7 @@ async def test_directional_battery_power_platform_lifecycle(
     assert_group((300, 0, 0, 0))
 
     hass.config_entries.async_update_entry(
-        config_entry, options={OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: False}
+        config_entry, options={OPT_DIRECTIONAL_BATTERY_POWER_ENABLED: False}
     )
     await _finish_startup(hass, config_entry)
     coord = config_entry.runtime_data.coordinator
@@ -448,7 +449,16 @@ async def test_directional_battery_power_platform_lifecycle(
         assert state is None or state.state == STATE_UNAVAILABLE
     assert entity_ids(("battery_power",))["battery_power"] == net_id
 
-    hass.config_entries.async_update_entry(config_entry, options={})
+    assert entity_ids(DIRECTIONAL_BATTERY_ENERGY_FIELDS) == energy_ids
+    assert all(hass.states.get(entity_id) for entity_id in energy_ids.values())
+
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={
+            OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: False,
+            OPT_DIRECTIONAL_BATTERY_POWER_ENABLED: True,
+        },
+    )
     await _finish_startup(hass, config_entry)
     coord = config_entry.runtime_data.coordinator
     assert_group()
@@ -456,6 +466,7 @@ async def test_directional_battery_power_platform_lifecycle(
     assert_group()
     await publish(grid_battery=[12150], charge=[12460])
     assert_group((600, 0, 0, 0))
+    assert not set(DIRECTIONAL_BATTERY_ENERGY_FIELDS) & coord.energy.site_energy.keys()
     await publish(report_lag=6)
     assert_group()
     await publish()

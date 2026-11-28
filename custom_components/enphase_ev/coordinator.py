@@ -97,6 +97,7 @@ from .const import (
     DEFAULT_API_TIMEOUT,
     DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
     DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+    DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED,
     DEFAULT_FAST_POLL_INTERVAL,
     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
@@ -121,6 +122,7 @@ from .const import (
     OPT_API_TIMEOUT,
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+    OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
     OPT_FAST_POLL_INTERVAL,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_NOMINAL_VOLTAGE,
@@ -1085,6 +1087,12 @@ class EnphaseCoordinator(
                 directional_battery_store(hass, self.site_id)
                 if config_entry is not None
                 else None
+            ),
+            directional_battery_power_enabled=bool(
+                (config_entry.options if config_entry is not None else {}).get(
+                    OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
+                    DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED,
+                )
             ),
             has_directional_battery_entities=lambda: has_directional_battery_entities(
                 hass, self.site_id

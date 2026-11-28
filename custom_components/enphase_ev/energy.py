@@ -22,10 +22,7 @@ from .directional_battery_energy import (
     SITE_ENERGY_SOURCE_FUTURE_SKEW_S,
     DirectionalBatteryEnergy,
 )
-from .directional_battery_power import (
-    DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED,
-    DirectionalBatteryPower,
-)
+from .directional_battery_power import DirectionalBatteryPower
 from .log_redaction import redact_site_id, redact_text
 
 LIFETIME_DROP_JITTER_KWH = 0.02
@@ -108,6 +105,7 @@ class EnergyManager:
         hems_auth_failure: Callable[[BaseException, str], bool] | None = None,
         hems_auth_success: Callable[[str], None] | None = None,
         directional_battery_enabled: bool = True,
+        directional_battery_power_enabled: bool = False,
         directional_battery_store: Store[dict[str, object]] | None = None,
         has_directional_battery_entities: Callable[[], bool] | None = None,
         directional_site_timezone: Callable[[], str | None] | None = None,
@@ -136,10 +134,11 @@ class EnergyManager:
         self._site_energy_cache_ttl: float = SITE_ENERGY_CACHE_TTL
         self._site_energy_guard: dict[str, LifetimeGuardState] = {}
         self._site_energy_last_reset: dict[str, str | None] = {}
+        self._directional_battery_energy_enabled = directional_battery_enabled
         self._directional_battery = DirectionalBatteryEnergy(
             self._coerce_lifetime_bucket,
             directional_battery_store,
-            enabled=directional_battery_enabled,
+            enabled=directional_battery_enabled or directional_battery_power_enabled,
             has_previous_entities=has_directional_battery_entities,
             site_timezone=directional_site_timezone,
         )
@@ -147,8 +146,7 @@ class EnergyManager:
         self._directional_battery_save_idle.set()
         self.directional_battery_power = (
             DirectionalBatteryPower(SITE_ENERGY_DEFAULT_INTERVAL_MIN * 60.0)
-            if directional_battery_enabled
-            and DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED
+            if directional_battery_power_enabled
             else None
         )
         self._site_energy_force_refresh = False
@@ -1390,7 +1388,11 @@ class EnergyManager:
                 payload,
                 apply_guards=accept,
                 device_totals=device_totals,
-                directional_totals=directional_totals,
+                directional_totals=(
+                    directional_totals
+                    if self._directional_battery_energy_enabled
+                    else {}
+                ),
             )
         )
         # A completed read consumes the polling interval even if none of its

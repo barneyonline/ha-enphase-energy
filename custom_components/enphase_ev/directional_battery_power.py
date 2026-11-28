@@ -25,10 +25,6 @@ from .power_validation import (
     site_power_sample_is_plausible,
 )
 
-# The lifetime recordings available for #1029 establish daily coverage.
-# See docs/api/directional_battery_power.md for the outstanding window evidence.
-DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED = False
-
 DIRECTIONAL_BATTERY_POWER_FIELDS = {
     "battery_power_from_grid": "grid_battery",
     "battery_power_from_solar": "solar_battery",
