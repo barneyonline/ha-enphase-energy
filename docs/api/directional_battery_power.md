@@ -22,11 +22,12 @@ unchanged counters can report 0 W. Missing channels or an invalid interval make
 the group unavailable. A reconciled decrease in the current day's counters on
 an advancing report clock discards both estimates and seeds a new power baseline.
 Power resumes after a full, reconciled window following that baseline. The
-counters for one or both directions can fall together with their direct
-aggregate during a cloud dropout. The group waits for the affected counters to
-recover to their pre-drop levels or for the site to enter a new day. It then
-seeds again. On reload, the saved same-day energy counters protect against
-starting in the middle of a dropout. A revision to a closed day needs a second
+counters for one or both directions and their direct aggregate can fall during
+a cloud dropout, sometimes over successive reports. The group waits for both
+directions and the direct aggregate in the affected pair to recover to their
+pre-drop levels or for the site to enter a new day. It then seeds again. The
+integration saves raw counters for restart protection separately from the
+cumulative energy baseline. A revision to a closed day needs a second
 advancing report with the same revised history before power can reseed. The
 cumulative energy history retains its own persisted baseline. The group stops
 reporting after 30 minutes without a fresh accepted window.

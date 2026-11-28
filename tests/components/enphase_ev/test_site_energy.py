@@ -728,6 +728,7 @@ def test_directional_battery_rejects_overflowing_total(coordinator_factory) -> N
         {"closed": {"grid_battery": True}},
         {"closed": dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), 10_000)},
         {"totals": dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), 0)},
+        {"totals": dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), 10**400)},
         [],
     ],
 )

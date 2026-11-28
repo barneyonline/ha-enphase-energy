@@ -1337,18 +1337,8 @@ class EnergyManager:
             directional_totals = self._directional_battery_totals(
                 payload, directional_source
             )
-            saved = True
-            if directional_totals:
-                self._directional_battery_save_idle.clear()
-                try:
-                    saved = await self._directional_battery.async_save()
-                    if not saved:
-                        directional_totals = {}
-                finally:
-                    self._directional_battery_save_idle.set()
-            if self._site_energy_read_superseded(generation):
-                return
-            if power is not None and saved:
+            power_wh = None
+            if power is not None:
                 power_totals = self._directional_battery_totals(
                     payload, directional_source, for_power=True
                 )
@@ -1362,6 +1352,19 @@ class EnergyManager:
                         self._coerce_lifetime_bucket,
                         startup_wh=self._directional_battery.power_startup_wh(),
                     )
+                    power_wh = power.recovery_wh(directional_source)
+            if directional_totals or power_wh is not None:
+                self._directional_battery_save_idle.clear()
+                try:
+                    if not await self._directional_battery.async_save(power_wh):
+                        directional_totals = {}
+                        power_totals = {}
+                finally:
+                    self._directional_battery_save_idle.set()
+            if self._site_energy_read_superseded(generation):
+                if power is not None:
+                    power.invalidate()
+                return
         if power is not None and not power_totals:
             power.invalidate()
         parsed = (

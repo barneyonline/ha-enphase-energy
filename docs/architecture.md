@@ -684,14 +684,15 @@ The power baseline is independent of the saved cumulative energy baseline.
 Missing, stale, or inconsistent data break the group's calculation history.
 Corrections to closed history need confirmation at an advancing report
 timestamp before power can seed again. Same-clock revisions break the window.
-When a direction and its direct aggregate fall together, the group waits for
-the affected counters to recover to their pre-drop levels before reseeding.
+When a direction and its direct aggregate fall relative to the last accepted
+window, the group waits for the affected pair's counters to recover to their
+pre-drop levels before reseeding.
 Site-local day rollover seeds a new power baseline even if the closing bucket
 was revised. The group's qualification and both power readings participate in
 coordinator snapshot equality. Each entity uses the group's source timestamp
-for freshness. Reloads use saved same-day energy counters to detect a dropout
-and seed watts from fresh upstream data. Entity registration is gated pending
-[short-window source validation](api/directional_battery_power.md).
+for freshness. Reloads use a separately saved record of same-day raw counters
+to detect a dropout and seed watts from fresh upstream data. Entity registration
+is gated pending [short-window source validation](api/directional_battery_power.md).
 
 Current Grid Power and Current Battery Power reseed their cumulative-energy
 baselines when missing source channels return, including during reload or reauth.

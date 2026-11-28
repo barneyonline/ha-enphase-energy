@@ -147,19 +147,24 @@ async def test_power_reseeds_after_revision_without_rebasing_lifetime_energy(
     assert power.average == power.interval
 
 
-async def test_failed_lifetime_save_breaks_the_power_window(
-    coordinator_factory, monkeypatch
+@pytest.mark.parametrize("superseded", [False, True])
+async def test_interrupted_lifetime_save_breaks_the_power_window(
+    coordinator_factory, monkeypatch, superseded
 ):
     monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
     now = _START
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
     read = AsyncMock()
     manager = coordinator_factory(client=SimpleNamespace(lifetime_energy=read)).energy
-    monkeypatch.setattr(
-        manager._directional_battery,
-        "async_save",
-        AsyncMock(side_effect=[True, True, False, True, True]),
-    )
+    async def save_history(power_wh):
+        if now == _START + timedelta(minutes=15):
+            if superseded:
+                manager._invalidate_site_energy_cache()
+                return True
+            return False
+        return True
+
+    monkeypatch.setattr(manager._directional_battery, "async_save", save_history)
     power = manager.directional_battery_power
 
     async def refresh(grid):
@@ -262,8 +267,65 @@ def test_pair_counter_drop_clears_at_site_day_rollover(replay):
     assert replay(900, grid=60, rollover=True).interval.watts["grid_battery"] == 600
 
 
+def test_pair_recovery_waits_for_both_directions(replay):
+    replay(0, grid=1050)
+    assert replay(300, grid=1050).interval is not None
+    for seconds, grid, solar in (
+        (600, 0, 2000),
+        (900, 800, 1800),
+        (1200, 1100, 1950),
+        (1500, 1100, 2000),
+    ):
+        power = replay(seconds, grid=grid, solar=solar)
+        assert power.interval is power.average is None
+    power = replay(1800, grid=1100, solar=2050)
+    assert power.interval.watts["solar_battery"] == 600
+    assert power.average == power.interval
+
+
+def test_two_counter_pair_dropouts_recover_independently(replay):
+    replay(0)
+    assert replay(300).interval is not None
+    for seconds, grid, home in (
+        (600, 0, 0),
+        (900, 1000, 0),
+        (1200, 1500, 500),
+        (1500, 1000, 3000),
+        (1800, 1500, 3000),
+    ):
+        power = replay(seconds, grid=grid, home=home)
+        assert power.interval is power.average is None
+    power = replay(2100, grid=1550, home=3000)
+    assert power.interval.watts["grid_battery"] == 600
+    assert power.average == power.interval
+
+
+def test_staggered_directional_and_direct_reductions_are_held(replay):
+    replay(0, grid=2000, solar=3000)
+    assert replay(300, grid=2000, solar=3000).interval is not None
+    for seconds, grid, charge in (
+        (600, 1800, 5000),
+        (900, 1800, 4800),
+        (1200, 2000, 5000),
+    ):
+        power = replay(seconds, grid=grid, solar=3000, charge=charge)
+        assert power.interval is power.average is None
+    assert replay(1500, grid=2050, solar=3000).interval.watts["grid_battery"] == 600
+
+
+def test_rejected_outlier_cannot_pin_the_dropout_guard(replay):
+    replay(0)
+    assert replay(300, grid=1050).interval.watts["grid_battery"] == 600
+    assert replay(600, grid=111050).interval is None
+    assert replay(900, grid=1100).interval is None
+    assert replay(1200, grid=1150).interval.watts["grid_battery"] == 600
+
+
+@pytest.mark.parametrize(
+    "history_kind", ["legacy", "corrupt_checkpoint", "power", "closed_revision"]
+)
 async def test_reload_during_dropout_uses_saved_same_day_counters(
-    coordinator_factory, monkeypatch
+    coordinator_factory, monkeypatch, history_kind
 ):
     monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
     now = _START
@@ -289,31 +351,54 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         return manager
 
     manager = new_manager()
+    closed_grid = 500
 
     async def refresh(seconds, grid):
         nonlocal now
         now = _START + timedelta(seconds=seconds)
         read.return_value = {
-            "start_date": now.date().isoformat(),
+            "start_date": (_START.date() - timedelta(days=1)).isoformat(),
             "last_report_date": now.timestamp(),
-            "grid_battery": [grid],
-            "solar_battery": [2000],
-            "battery_home": [0],
-            "battery_grid": [0],
-            "charge": [grid + 2000],
-            "discharge": [0],
+            "grid_battery": [closed_grid, grid],
+            "solar_battery": [0, 2000],
+            "battery_home": [0, 0],
+            "battery_grid": [0, 0],
+            "charge": [closed_grid, grid + 2000],
+            "discharge": [0, 0],
         }
         await manager._async_refresh_site_energy(force=True)
         return manager.directional_battery_power.interval
 
     assert await refresh(0, 1000) is None
     assert (await refresh(300, 1050)).watts["grid_battery"] == 600
+    if history_kind == "closed_revision":
+        closed_grid = 450
+        assert await refresh(600, 1100) is None
+        assert await refresh(900, 1250) is None
+        assert (await refresh(1200, 1300)).watts["grid_battery"] == 600
+        assert "battery_energy_from_grid" not in manager.site_energy
+        assert saved["totals"]["grid_battery"] == 1550
+    elif history_kind == "legacy":
+        del saved["power"]
+    elif history_kind == "corrupt_checkpoint":
+        del saved["power"]["wh"]["charge"]
+
     manager = new_manager()
     assert await refresh(150, 1000) is None
-    assert await refresh(600, 0) is None
-    assert await refresh(900, 750) is None
-    assert await refresh(1200, 1050) is None
-    assert (await refresh(1500, 1100)).watts["grid_battery"] == 600
+    if history_kind == "closed_revision":
+        # This clock is newer than the cumulative baseline and older than the
+        # last power checkpoint. It must not lower the restart guard.
+        assert await refresh(1050, 850) is None
+        assert saved["power"]["wh"]["grid_battery"] == 1300
+    recovery = 1300 if history_kind == "closed_revision" else 1050
+    for seconds, grid in (
+        (1500, 0),
+        (1800, 750),
+        (2100, 1000),
+        (2400, recovery),
+    ):
+        assert await refresh(seconds, grid) is None
+    assert (await refresh(2700, recovery + 50)).watts["grid_battery"] == 600
 
 
 async def test_closed_day_revision_waits_for_confirmation_then_seeds_power(
@@ -405,3 +490,8 @@ def test_finite_counter_can_still_overflow_conversion(replay):
     replay(0)
     power = replay(300, grid=1e308)
     assert power.interval is power.average is None
+
+
+def test_invalid_report_cannot_supply_a_new_recovery_checkpoint(replay):
+    power = replay(0, overrides={"charge": [True]})
+    assert power.recovery_wh(_START) is None

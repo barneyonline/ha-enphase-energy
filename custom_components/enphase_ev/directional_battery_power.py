@@ -53,7 +53,8 @@ class DirectionalBatteryPower:
         self._minimum_window_seconds = minimum_window_seconds
         self._baseline: _Report | None = None
         self._last_report: _Report | None = None
-        self._dropout_watermarks: dict[str, float] = {}
+        self._recovery_reference: _Report | None = None
+        self._dropout_watermarks: dict[str, dict[str, float]] = {}
         self._validators = {field: ExtremePowerValidator() for field in _FIELDS}
         self._averages = {field: EnergyPowerAverage() for field in _FIELDS}
         self.qualified = False
@@ -115,38 +116,19 @@ class DirectionalBatteryPower:
                 self.invalidate()
             return
         self._last_report = report
-        if previous is None:
-            if startup_wh is not None:
-                self._dropout_watermarks = {
-                    field: value
-                    for field, value in startup_wh.items()
-                    if report.wh[field] < value
-                }
-        elif report.bucket_count != previous.bucket_count:
+        recovering = bool(self._dropout_watermarks)
+        rollover = previous is not None and report.bucket_count != previous.bucket_count
+        if rollover:
             self._dropout_watermarks.clear()
         else:
-            for aggregate, fields in _AGGREGATE_PAIRS.items():
-                lowered = [
-                    field for field in fields if report.wh[field] < previous.wh[field]
-                ]
-                if lowered and report.wh[aggregate] < previous.wh[aggregate]:
-                    for field in (aggregate, *lowered):
-                        before_drop = previous.wh[field]
-                        self._dropout_watermarks[field] = max(
-                            self._dropout_watermarks.get(field, before_drop),
-                            before_drop,
-                        )
+            self._track_dropouts(
+                report, self._recovery_reference or previous, startup_wh
+            )
+        if previous is None or rollover or recovering or self._dropout_watermarks:
+            self._recovery_reference = report
         if self._dropout_watermarks:
-            # Related counters can drop and restore together, passing the
-            # arithmetic checks even when no energy flowed. Wait for complete
-            # restoration of the affected readings before seeding a window.
             self.invalidate()
-            if any(
-                report.wh[field] < value
-                for field, value in self._dropout_watermarks.items()
-            ):
-                return
-            self._dropout_watermarks.clear()
+            return
         baseline = self._baseline
         if (
             baseline is None
@@ -209,6 +191,7 @@ class DirectionalBatteryPower:
             return
 
         self.qualified = True
+        self._recovery_reference = report
         self.interval = DirectionalBatteryPowerReading(
             report.reported_at, seconds, watts
         )
@@ -235,3 +218,46 @@ class DirectionalBatteryPower:
         self.average = DirectionalBatteryPowerReading(
             report.reported_at, window, averaged_watts
         )
+
+    def _track_dropouts(
+        self,
+        report: _Report,
+        previous: _Report | None,
+        startup_wh: Mapping[str, float] | None,
+    ) -> None:
+        """Require the entire affected pair to recover before reseeding."""
+        for aggregate, fields in _AGGREGATE_PAIRS.items():
+            if (watermarks := self._dropout_watermarks.get(aggregate)) is not None:
+                if all(
+                    report.wh[field] >= value for field, value in watermarks.items()
+                ):
+                    del self._dropout_watermarks[aggregate]
+            elif previous is not None:
+                if report.wh[aggregate] < previous.wh[aggregate] and any(
+                    report.wh[field] < previous.wh[field] for field in fields
+                ):
+                    self._dropout_watermarks[aggregate] = {
+                        field: previous.wh[field] for field in (aggregate, *fields)
+                    }
+            elif startup_wh is not None:
+                saved = {
+                    field: startup_wh[field]
+                    for field in (aggregate, *fields)
+                    if field in startup_wh
+                }
+                if any(report.wh[field] < value for field, value in saved.items()):
+                    self._dropout_watermarks[aggregate] = saved
+
+    def recovery_wh(self, reported_at: datetime) -> dict[str, float] | None:
+        """Checkpoint raw counters and pre-drop values without saving watts."""
+        report = self._last_report
+        if report is None or report.reported_at != reported_at:
+            return None
+        # A revision or unconfirmed outlier can move the calculation baseline
+        # before the next trustworthy report. Retain the earlier guard.
+        reference = self._recovery_reference
+        assert reference is not None
+        wh = reference.wh.copy()
+        for watermarks in self._dropout_watermarks.values():
+            wh.update(watermarks)
+        return wh

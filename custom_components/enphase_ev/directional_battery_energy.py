@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timezone, tzinfo
 from hashlib import sha256
+from sys import float_info
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -115,7 +116,7 @@ class _BatteryHistory:
                 or not isinstance(total_value, int | float)
                 or isinstance(closed_value, bool)
                 or isinstance(total_value, bool)
-                or not 0 <= closed_value <= total_value < math.inf
+                or not 0 <= closed_value <= total_value <= float_info.max
             ):
                 return None
         return cls(
@@ -150,6 +151,7 @@ class DirectionalBatteryEnergy:
         self._loaded = store is None
         self._history: _BatteryHistory | None = None
         self._saved_history: _BatteryHistory | None = None
+        self._saved_power_checkpoint: dict[str, object] | None = None
         self._power_source_history: _BatteryHistory | None = None
         self._pending_power_source_history: _BatteryHistory | None = None
         self._load_warning_logged = False
@@ -191,6 +193,10 @@ class DirectionalBatteryEnergy:
             if self._history is None:
                 self._warn_load_once("Invalid directional battery energy history")
                 return
+            if isinstance(saved, dict) and isinstance(
+                checkpoint := saved.get("power"), dict
+            ):
+                self._saved_power_checkpoint = checkpoint
         elif self._has_previous_entities is not None and self._has_previous_entities():
             # Core can also return None after renaming a corrupt storage file.
             # An existing entity may still have Recorder history to protect.
@@ -201,18 +207,40 @@ class DirectionalBatteryEnergy:
         self._saved_history = self._history
         self._loaded = True
 
-    async def async_save(self) -> bool:
+    async def async_save(self, power_wh: dict[str, float] | None = None) -> bool:
         """Persist the accepted group history before the coordinator notifies sensors."""
         history = self._history
-        if self._store is None or history is None or history == self._saved_history:
+        checkpoint = self._saved_power_checkpoint
+        power_source = self._power_source_history
+        if power_wh is not None:
+            assert power_source is not None
+            checkpoint = {
+                "start": power_source.start.isoformat(),
+                "timezone": power_source.timezone,
+                "size": power_source.size,
+                "reported_at": power_source.reported_at.timestamp(),
+                "wh": power_wh,
+            }
+        if (
+            self._store is None
+            or history is None
+            or (
+                history == self._saved_history
+                and checkpoint == self._saved_power_checkpoint
+            )
+        ):
             return True
+        data = history.as_dict()
+        if checkpoint is not None:
+            data["power"] = checkpoint
         try:
-            await self._store.async_save(history.as_dict())
+            await self._store.async_save(data)
         except (HomeAssistantError, OSError):
             self._history = self._saved_history
             _LOGGER.warning("Unable to save directional battery energy history")
             return False
         self._saved_history = history
+        self._saved_power_checkpoint = checkpoint
         return True
 
     def totals(
@@ -241,6 +269,11 @@ class DirectionalBatteryEnergy:
             return {}
         history, count = result
         if for_power:
+            checkpoint = self._saved_power_checkpoint
+            if previous is None and checkpoint is not None:
+                saved_clock = self._coerce_bucket(checkpoint.get("reported_at"))
+                if saved_clock is not None and reported_at.timestamp() < saved_clock:
+                    return {}
             if not self._accept_power_source_history(history):
                 return {}
         else:
@@ -272,11 +305,26 @@ class DirectionalBatteryEnergy:
 
     def power_startup_wh(self) -> dict[str, float] | None:
         """Return saved same-day counters to guard a reload during a dropout."""
-        saved = self._saved_history
         current = self._power_source_history
+        assert current is not None
+        checkpoint = self._saved_power_checkpoint
+        if (
+            checkpoint is not None
+            and current.start.isoformat() == checkpoint.get("start")
+            and current.timezone == checkpoint.get("timezone")
+            and current.size == checkpoint.get("size")
+            and isinstance(raw := checkpoint.get("wh"), dict)
+        ):
+            counters = {
+                field: value
+                for field in (*_FIELDS, *_AGGREGATE_PAIRS)
+                if (value := self._coerce_bucket(raw.get(field))) is not None
+            }
+            if len(counters) == len(_FIELDS) + len(_AGGREGATE_PAIRS):
+                return counters
+        saved = self._saved_history
         if (
             saved is None
-            or current is None
             or saved.start != current.start
             or saved.timezone != current.timezone
             or saved.size != current.size
