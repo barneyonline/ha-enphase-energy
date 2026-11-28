@@ -15,14 +15,15 @@ EXTREME_CONFIRM_MAX_RATIO = 2.0
 
 
 def _energy_delta_to_power_w(
-    delta_kwh: float,
+    delta_energy: float,
     *,
     window_s: float,
     floor_zero: bool = False,
     max_watts: float | None = None,
+    wh_per_unit: int = 1000,
 ) -> int:
     """Convert an energy delta over a window into watts."""
-    watts = (delta_kwh * 3_600_000.0) / window_s
+    watts = (delta_energy * (wh_per_unit * 3600.0)) / window_s
     if floor_zero and watts < 0:
         watts = 0
     if max_watts is not None and watts > max_watts:

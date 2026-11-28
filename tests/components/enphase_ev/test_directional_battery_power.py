@@ -102,6 +102,26 @@ def test_subwatt_movement_rounds_to_zero_in_both_modes(replay):
     assert power.average.watts["grid_battery"] == 0
 
 
+@pytest.mark.parametrize(
+    ("delta_wh", "seconds", "expected"), [(1, 480, 8), (0.125, 300, 2)]
+)
+def test_single_window_smoothing_rounds_from_raw_watt_hours(
+    replay, delta_wh, seconds, expected
+):
+    replay(0)
+    power = replay(seconds, grid=1000 + delta_wh)
+    assert power.interval.watts["grid_battery"] == expected
+    assert power.average == power.interval
+
+
+def test_published_power_readings_are_read_only(replay):
+    replay(0)
+    power = replay(300, grid=1050)
+    for reading in (power.interval, power.average):
+        with pytest.raises(TypeError):
+            reading.watts["grid_battery"] = 0
+
+
 def test_entity_starts_without_value_or_source_attributes(coordinator_factory):
     entity = EnphaseDirectionalBatteryPowerSensor(
         coordinator_factory(), "battery_power_from_grid", DirectionalBatteryPower(300)

@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 import math
+from types import MappingProxyType
 
 from .const import CLOUD_TELEMETRY_STALE_AFTER_S
 from .directional_battery_energy import (
@@ -42,7 +43,7 @@ class DirectionalBatteryPowerReading:
 
     reported_at: datetime
     window_seconds: float
-    watts: dict[str, int]
+    watts: Mapping[str, int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +67,7 @@ class DirectionalBatteryPower:
         self._recovery_scope: tuple[DirectionalBatterySource, int] | None = None
         self._recovery_references: dict[str, DirectionalBatteryPairReference] = {}
         self._validators = {field: ExtremePowerValidator() for field in _FIELDS}
-        self._averages = {field: EnergyPowerAverage() for field in _FIELDS}
+        self._averages = {field: EnergyPowerAverage(wh_per_unit=1) for field in _FIELDS}
         self._next_interval: DirectionalBatteryPowerReading | None = None
         self._next_average: DirectionalBatteryPowerReading | None = None
         self.qualified = False
@@ -261,7 +262,7 @@ class DirectionalBatteryPower:
                     trusted, report, totals, aggregate, fields, confirmed
                 )
         self._next_interval = DirectionalBatteryPowerReading(
-            report.reported_at, seconds, watts
+            report.reported_at, seconds, MappingProxyType(watts)
         )
         if any(result.confirmed_extreme for result in validation.values()):
             for average in self._averages.values():
@@ -274,17 +275,15 @@ class DirectionalBatteryPower:
             if not average.samples:
                 average.add(
                     baseline.reported_at.timestamp(),
-                    baseline.wh[field] / 1000.0,
+                    baseline.wh[field],
                     "source",
                 )
-            average.add(
-                report.reported_at.timestamp(), report.wh[field] / 1000.0, "source"
-            )
+            average.add(report.reported_at.timestamp(), report.wh[field], "source")
             value = average.value()
             assert value is not None
             averaged_watts[field], window = value
         self._next_average = DirectionalBatteryPowerReading(
-            report.reported_at, window, averaged_watts
+            report.reported_at, window, MappingProxyType(averaged_watts)
         )
 
     def _track_recovery(
@@ -417,7 +416,7 @@ def _direction_watts(
     ):
         return None
     return {
-        field: _energy_delta_to_power_w(deltas[field] / 1000.0, window_s=seconds)
+        field: _energy_delta_to_power_w(deltas[field], window_s=seconds, wh_per_unit=1)
         for field in fields
     }
 
