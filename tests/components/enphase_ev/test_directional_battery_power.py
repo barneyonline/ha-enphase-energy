@@ -236,19 +236,123 @@ def test_advancing_direct_counter_revision_seeds_new_window(replay):
     assert power.average == power.interval
 
 
-def test_complete_pair_dropout_stays_unavailable_until_fresh_window(replay):
-    replay(0, solar=0)
-    assert replay(300, grid=1050, solar=0).interval.watts["grid_battery"] == 600
+@pytest.mark.parametrize("solar", [0, 2000])
+@pytest.mark.parametrize("lowered_grid", [0, 50])
+def test_pair_counter_drop_stays_unavailable_until_fresh_window(
+    replay, solar, lowered_grid
+):
+    replay(0, solar=solar)
+    assert replay(300, grid=1050, solar=solar).interval.watts["grid_battery"] == 600
 
-    for seconds in (600, 900):
-        power = replay(seconds, grid=0, solar=0)
+    for seconds, grid in ((600, lowered_grid), (900, lowered_grid), (1200, 750)):
+        power = replay(seconds, grid=grid, solar=solar)
         assert power.interval is power.average is None
 
-    power = replay(1200, grid=1050, solar=0)
+    power = replay(1500, grid=1050, solar=solar)
     assert power.interval is power.average is None
-    power = replay(1500, grid=1100, solar=0)
+    power = replay(1800, grid=1100, solar=solar)
     assert power.interval.watts["grid_battery"] == 600
     assert power.average == power.interval
+
+
+def test_pair_counter_drop_clears_at_site_day_rollover(replay):
+    replay(0)
+    assert replay(300, grid=50).interval is None
+    assert replay(600, grid=10, rollover=True).interval is None
+    assert replay(900, grid=60, rollover=True).interval.watts["grid_battery"] == 600
+
+
+async def test_reload_during_dropout_uses_saved_same_day_counters(
+    coordinator_factory, monkeypatch
+):
+    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    now = _START
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    read = AsyncMock()
+    saved = None
+
+    async def load_history():
+        return saved
+
+    async def save_history(history):
+        nonlocal saved
+        saved = history
+
+    def new_manager():
+        manager = coordinator_factory(
+            client=SimpleNamespace(lifetime_energy=read)
+        ).energy
+        manager._directional_battery._store = SimpleNamespace(
+            async_load=load_history, async_save=save_history
+        )
+        manager._directional_battery._loaded = False
+        return manager
+
+    manager = new_manager()
+
+    async def refresh(seconds, grid):
+        nonlocal now
+        now = _START + timedelta(seconds=seconds)
+        read.return_value = {
+            "start_date": now.date().isoformat(),
+            "last_report_date": now.timestamp(),
+            "grid_battery": [grid],
+            "solar_battery": [2000],
+            "battery_home": [0],
+            "battery_grid": [0],
+            "charge": [grid + 2000],
+            "discharge": [0],
+        }
+        await manager._async_refresh_site_energy(force=True)
+        return manager.directional_battery_power.interval
+
+    assert await refresh(0, 1000) is None
+    assert (await refresh(300, 1050)).watts["grid_battery"] == 600
+    manager = new_manager()
+    assert await refresh(150, 1000) is None
+    assert await refresh(600, 0) is None
+    assert await refresh(900, 750) is None
+    assert await refresh(1200, 1050) is None
+    assert (await refresh(1500, 1100)).watts["grid_battery"] == 600
+
+
+async def test_closed_day_revision_waits_for_confirmation_then_seeds_power(
+    coordinator_factory, monkeypatch
+):
+    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    now = _START
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    read = AsyncMock()
+    manager = coordinator_factory(client=SimpleNamespace(lifetime_energy=read)).energy
+    power = manager.directional_battery_power
+
+    async def refresh(seconds, closed_grid, active_grid):
+        nonlocal now
+        now = _START + timedelta(seconds=seconds)
+        read.return_value = {
+            "start_date": (_START.date() - timedelta(days=1)).isoformat(),
+            "last_report_date": now.timestamp(),
+            "grid_battery": [closed_grid, active_grid],
+            "solar_battery": [100, 200],
+            "battery_home": [0, 0],
+            "battery_grid": [0, 0],
+            "charge": [closed_grid + 100, active_grid + 200],
+            "discharge": [0, 0],
+        }
+        await manager._async_refresh_site_energy(force=True)
+
+    await refresh(0, 500, 1000)
+    await refresh(300, 500, 1050)
+    assert power.interval.watts["grid_battery"] == 600
+    for seconds, closed in ((600, 450), (600, 450), (900, 400), (1200, 400)):
+        await refresh(seconds, closed, 1100)
+        assert power.interval is power.average is None
+        assert "battery_energy_from_grid" not in manager.site_energy
+
+    await refresh(1500, 400, 1150)
+    assert power.interval.watts["grid_battery"] == 600
+    assert power.average == power.interval
+    assert "battery_energy_from_grid" not in manager.site_energy
 
 
 @pytest.mark.parametrize("bad_time", [150, 300])

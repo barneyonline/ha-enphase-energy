@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 import math
@@ -53,7 +53,7 @@ class DirectionalBatteryPower:
         self._minimum_window_seconds = minimum_window_seconds
         self._baseline: _Report | None = None
         self._last_report: _Report | None = None
-        self._dropout_pairs: set[str] = set()
+        self._dropout_watermarks: dict[str, float] = {}
         self._validators = {field: ExtremePowerValidator() for field in _FIELDS}
         self._averages = {field: EnergyPowerAverage() for field in _FIELDS}
         self.qualified = False
@@ -75,6 +75,8 @@ class DirectionalBatteryPower:
         received_at: datetime,
         totals: dict[str, tuple[float, int]],
         coerce_bucket: Callable[[object], float | None],
+        *,
+        startup_wh: Mapping[str, float] | None = None,
     ) -> None:
         """Use a daily payload accepted for power by the lifetime source validator."""
         wh: dict[str, float] = {}
@@ -97,6 +99,7 @@ class DirectionalBatteryPower:
             _Report(reported_at, bucket_count, wh),
             received_at,
             totals,
+            startup_wh,
         )
 
     def _observe(
@@ -104,6 +107,7 @@ class DirectionalBatteryPower:
         report: _Report,
         received_at: datetime,
         totals: dict[str, tuple[float, int]],
+        startup_wh: Mapping[str, float] | None,
     ) -> None:
         previous = self._last_report
         if previous is not None and report.reported_at <= previous.reported_at:
@@ -111,20 +115,38 @@ class DirectionalBatteryPower:
                 self.invalidate()
             return
         self._last_report = report
-        if previous is None or report.bucket_count != previous.bucket_count:
-            self._dropout_pairs.clear()
+        if previous is None:
+            if startup_wh is not None:
+                self._dropout_watermarks = {
+                    field: value
+                    for field, value in startup_wh.items()
+                    if report.wh[field] < value
+                }
+        elif report.bucket_count != previous.bucket_count:
+            self._dropout_watermarks.clear()
         else:
-            for aggregate in _AGGREGATE_PAIRS:
-                if report.wh[aggregate] > 0:
-                    self._dropout_pairs.discard(aggregate)
-                elif previous.wh[aggregate] > 0:
-                    self._dropout_pairs.add(aggregate)
-        if self._dropout_pairs:
-            # A whole previously active pair disappearing can be a cloud
-            # dropout. Keep the window empty so restoration cannot look like
-            # new energy, even after several consecutive zero reports.
+            for aggregate, fields in _AGGREGATE_PAIRS.items():
+                lowered = [
+                    field for field in fields if report.wh[field] < previous.wh[field]
+                ]
+                if lowered and report.wh[aggregate] < previous.wh[aggregate]:
+                    for field in (aggregate, *lowered):
+                        before_drop = previous.wh[field]
+                        self._dropout_watermarks[field] = max(
+                            self._dropout_watermarks.get(field, before_drop),
+                            before_drop,
+                        )
+        if self._dropout_watermarks:
+            # Related counters can drop and restore together, passing the
+            # arithmetic checks even when no energy flowed. Wait for complete
+            # restoration of the affected readings before seeding a window.
             self.invalidate()
-            return
+            if any(
+                report.wh[field] < value
+                for field, value in self._dropout_watermarks.items()
+            ):
+                return
+            self._dropout_watermarks.clear()
         baseline = self._baseline
         if (
             baseline is None

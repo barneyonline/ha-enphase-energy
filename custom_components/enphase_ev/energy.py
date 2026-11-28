@@ -1360,6 +1360,7 @@ class EnergyManager:
                         dt_util.utcnow(),
                         power_totals,
                         self._coerce_lifetime_bucket,
+                        startup_wh=self._directional_battery.power_startup_wh(),
                     )
         if power is not None and not power_totals:
             power.invalidate()

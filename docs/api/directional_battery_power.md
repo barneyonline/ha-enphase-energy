@@ -22,10 +22,13 @@ unchanged counters can report 0 W. Missing channels or an invalid interval make
 the group unavailable. A reconciled decrease in the current day's counters on
 an advancing report clock discards both estimates and seeds a new power baseline.
 Power resumes after a full, reconciled window following that baseline. The
-counters of a previously active charge or discharge pair can all drop to zero
-during a cloud dropout. The group stays unavailable through those reports and
-seeds again when the pair returns. The cumulative energy history retains its
-own persisted baseline. The group stops
+counters for one or both directions can fall together with their direct
+aggregate during a cloud dropout. The group waits for the affected counters to
+recover to their pre-drop levels or for the site to enter a new day. It then
+seeds again. On reload, the saved same-day energy counters protect against
+starting in the middle of a dropout. A revision to a closed day needs a second
+advancing report with the same revised history before power can reseed. The
+cumulative energy history retains its own persisted baseline. The group stops
 reporting after 30 minutes without a fresh accepted window.
 **Use 15-minute Power Average** applies the same rolling,
 elapsed-time-weighted averaging used by Battery Power. Cloud updates can arrive

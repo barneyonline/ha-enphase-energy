@@ -151,6 +151,7 @@ class DirectionalBatteryEnergy:
         self._history: _BatteryHistory | None = None
         self._saved_history: _BatteryHistory | None = None
         self._power_source_history: _BatteryHistory | None = None
+        self._pending_power_source_history: _BatteryHistory | None = None
         self._load_warning_logged = False
 
     def site_context_refresh_due(self) -> bool:
@@ -226,6 +227,13 @@ class DirectionalBatteryEnergy:
         if not self._enabled or not self._loaded or self._zone is None:
             return {}
         previous = self._power_source_history if for_power else self._history
+        if (
+            for_power
+            and previous is None
+            and self._saved_history is not None
+            and reported_at < self._saved_history.reported_at
+        ):
+            return {}
         result = self._evaluate(
             payload, start, reported_at, previous, for_power=for_power
         )
@@ -233,10 +241,57 @@ class DirectionalBatteryEnergy:
             return {}
         history, count = result
         if for_power:
-            self._power_source_history = history
+            if not self._accept_power_source_history(history):
+                return {}
         else:
             self._history = history
         return {field: (total, count) for field, total in history.totals.items()}
+
+    def _accept_power_source_history(self, history: _BatteryHistory) -> bool:
+        previous = self._power_source_history
+        pending = self._pending_power_source_history
+        if pending is not None and history.reported_at <= pending.reported_at:
+            return False
+        if (
+            previous is not None
+            and history.closed_buckets[: len(previous.closed_buckets)]
+            != previous.closed_buckets
+            and (
+                pending is None
+                or history.closed_buckets[: len(pending.closed_buckets)]
+                != pending.closed_buckets
+            )
+        ):
+            # A new version of closed history must persist at an advancing
+            # cursor. Reject this report so no window spans the correction.
+            self._pending_power_source_history = history
+            return False
+        self._power_source_history = history
+        self._pending_power_source_history = None
+        return True
+
+    def power_startup_wh(self) -> dict[str, float] | None:
+        """Return saved same-day counters to guard a reload during a dropout."""
+        saved = self._saved_history
+        current = self._power_source_history
+        if (
+            saved is None
+            or current is None
+            or saved.start != current.start
+            or saved.timezone != current.timezone
+            or saved.size != current.size
+        ):
+            return None
+        # The saved cumulative sums can round by a fraction of a raw Wh.
+        return {
+            field: max(
+                0.0,
+                saved.totals[field]
+                - saved.closed[field]
+                - math.ulp(saved.totals[field]),
+            )
+            for field in _FIELDS
+        }
 
     def _evaluate(
         self,
@@ -299,6 +354,7 @@ class DirectionalBatteryEnergy:
             if (
                 previous is not None
                 and index == previous.size - 1
+                and not for_power
                 and totals != previous.closed
             ):
                 return None
@@ -309,21 +365,17 @@ class DirectionalBatteryEnergy:
                 for field, values in series.items()
                 if (sample := self._coerce_bucket(values[index])) is not None
             }
-            if for_power and index < size - 1:
-                bucket = tuple(reported.get(field) for field in _FIELDS)
-                if (
-                    previous is not None
-                    and index < len(previous.closed_buckets)
-                    and bucket != previous.closed_buckets[index]
-                ):
-                    return None
-                closed_buckets.append(bucket)
             direct = {
                 key: total
                 for key, values in aggregates.items()
                 if index < len(values)
                 and (total := self._coerce_bucket(values[index])) is not None
             }
+            if for_power and index < size - 1:
+                closed_buckets.append(
+                    tuple(reported.get(field) for field in _FIELDS)
+                    + tuple(direct.get(field) for field in _AGGREGATE_PAIRS)
+                )
             if not reported:
                 if reporting_started or any(direct.values()):
                     return None
