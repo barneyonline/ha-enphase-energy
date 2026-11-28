@@ -137,7 +137,10 @@ from .const import (
 from .battery_runtime import BatteryRuntime
 from .coordinator_diagnostics import CoordinatorDiagnostics
 from .current_power_runtime import CurrentPowerRuntime, CurrentPowerSample
-from .directional_battery_energy import directional_battery_store
+from .directional_battery_energy import (
+    directional_battery_store,
+    has_directional_battery_entities,
+)
 from .discovery_snapshot import DiscoverySnapshotManager
 from .device_types import (
     normalize_type_key,
@@ -1072,6 +1075,9 @@ class EnphaseCoordinator(
                 directional_battery_store(hass, config_entry.entry_id)
                 if config_entry is not None
                 else None
+            ),
+            has_directional_battery_entities=lambda: has_directional_battery_entities(
+                hass, self.site_id
             ),
         )
         self.evse_timeseries = EVSETimeseriesManager(

@@ -618,6 +618,10 @@ class EnphaseDirectionalBatteryEnergySensor(EnphaseSiteEnergySensor):
     def __init__(self, coord: EnphaseCoordinator, flow_key: str) -> None:
         super().__init__(coord, flow_key, flow_key, flow_key, type_key="encharge")
 
+    @property
+    def available(self) -> bool:
+        return self._current_value() is not None and super().available
+
 
 class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]
     @callback

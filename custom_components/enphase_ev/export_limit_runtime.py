@@ -16,8 +16,6 @@ from weakref import WeakValueDictionary
 import aiohttp
 from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
 from homeassistant.helpers.storage import Store
-from homeassistant.util.file import WriteError
-from homeassistant.util.json import SerializationError
 from homeassistant.helpers import issue_registry as ir
 
 from .api import ActivationAccessDenied, Unauthorized
@@ -38,6 +36,7 @@ from .const import (
 from .device_types import member_is_retired
 from .runtime_helpers import normalize_poll_intervals
 from .repair_issues import entry_issue_kwargs
+from .storage import AcknowledgedStore
 
 OBSERVATION_SECONDS = BATTERY_PROFILE_PENDING_TIMEOUT_S
 _ENTRY_LOCKS = f"{DOMAIN}.export_limit.locks"
@@ -185,45 +184,6 @@ def parse_settings(
     )
 
 
-class ExportLimitIntentStore(Store[dict[str, Any]]):  # type: ignore[misc]
-    """Acknowledge atomic intent writes before the runtime changes authority."""
-
-    def __init__(self, hass: Any, version: int, key: str) -> None:
-        super().__init__(hass, version, key, atomic_writes=True)
-        self._written = False
-
-    async def async_save(self, data: dict[str, Any]) -> None:
-        # The runtime lock serializes saves. Drain a cancelled disk write
-        # before releasing that lock or trying to clear the record.
-        task = asyncio.create_task(self._async_save_checked(data))
-        cancelled = False
-        while not task.done():
-            try:
-                await asyncio.shield(task)
-            except asyncio.CancelledError:
-                cancelled = True
-        task.result()
-        if cancelled:
-            raise asyncio.CancelledError
-
-    async def _async_save_checked(self, data: dict[str, Any]) -> None:
-        self._written = False
-        await super().async_save(data)
-        if not self._written:
-            # Core may have deferred the save until final_write.
-            await self._async_handle_write_data()
-        if not self._written:
-            raise OSError("Export Limit intent write was not acknowledged")
-
-    async def _async_write_data(self, data: dict[str, Any]) -> None:
-        try:
-            await super()._async_write_data(data)
-        except (WriteError, SerializationError) as err:
-            # HA Store logs these and returns. Surface the failure to the caller.
-            raise OSError("Could not persist Export Limit intent") from err
-        self._written = True
-
-
 class ExportLimitRuntime:
     """Own all write gates and one durable pending request per config entry."""
 
@@ -259,7 +219,7 @@ class ExportLimitRuntime:
         self._lock = locks.setdefault(storage_key, asyncio.Lock())
         # The entry may reload while its old Store still contains unsent intent.
         self._unsent_cleanup_key = f"{storage_key}.unsent_cleanup"
-        self._store: Store[dict[str, Any]] = ExportLimitIntentStore(
+        self._store: Store[dict[str, Any]] = AcknowledgedStore(
             coordinator.hass, 1, storage_key
         )
 

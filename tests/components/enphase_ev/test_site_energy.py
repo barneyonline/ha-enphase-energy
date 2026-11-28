@@ -283,6 +283,28 @@ def test_directional_battery_reconciles_across_bucket_rollover(
         assert flows["battery_energy_to_grid"].value_kwh == 0.1
 
 
+async def test_directional_battery_empty_payload_invalidates_cached_directions(
+    coordinator_factory, directional_battery_payload
+) -> None:
+    manager = coordinator_factory(
+        client=SimpleNamespace(
+            lifetime_energy=AsyncMock(
+                side_effect=[
+                    directional_battery_payload,
+                    {"last_report_date": 1_700_000_301},
+                ]
+            )
+        )
+    ).energy
+    await manager._async_refresh_site_energy(force=True)
+    keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    assert manager.site_energy.keys() >= keys
+    charge = manager.site_energy["battery_charge"]
+    await manager._async_refresh_site_energy(force=True)
+    assert not manager.site_energy.keys() & keys
+    assert manager.site_energy["battery_charge"] is charge
+
+
 @pytest.mark.parametrize(
     "invalid_entry",
     [

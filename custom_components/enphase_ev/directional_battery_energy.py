@@ -10,10 +10,12 @@ from datetime import date, datetime
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DIRECTIONAL_BATTERY_ENERGY_FIELDS, DOMAIN
+from .storage import AcknowledgedStore
 
 _FIELDS = tuple(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values())
 _AGGREGATE_PAIRS = {
@@ -27,12 +29,20 @@ def directional_battery_store(
     hass: HomeAssistant, entry_id: str
 ) -> Store[dict[str, object]]:
     """Store the site's published battery history independently of entity restore."""
-    return Store(
-        hass,
-        1,
-        f"{DOMAIN}.directional_battery_energy.{entry_id}",
-        private=True,
-        atomic_writes=True,
+    return AcknowledgedStore(
+        hass, 1, f"{DOMAIN}.directional_battery_energy.{entry_id}", private=True
+    )
+
+
+def has_directional_battery_entities(hass: HomeAssistant, site_id: str) -> bool:
+    """Check if this site already has directional entity IDs to protect."""
+    registry = er.async_get(hass)
+    return any(
+        registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{DOMAIN}_site_{site_id}_{flow}"
+        )
+        is not None
+        for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS
     )
 
 
@@ -105,10 +115,12 @@ class DirectionalBatteryEnergy:
         store: Store[dict[str, object]] | None,
         *,
         enabled: bool,
+        has_previous_entities: Callable[[], bool] | None = None,
     ) -> None:
         self._coerce_bucket = coerce_bucket
         self._store = store
         self._enabled = enabled
+        self._has_previous_entities = has_previous_entities
         self._loaded = store is None
         self._history: _BatteryHistory | None = None
         self._saved_history: _BatteryHistory | None = None
@@ -119,7 +131,7 @@ class DirectionalBatteryEnergy:
             return
         try:
             saved = await self._store.async_load()
-        except HomeAssistantError:
+        except (HomeAssistantError, OSError, KeyError, TypeError, ValueError):
             _LOGGER.warning("Unable to load directional battery energy history")
             return
         if saved is not None:
@@ -129,6 +141,11 @@ class DirectionalBatteryEnergy:
             if self._history is None:
                 _LOGGER.warning("Invalid directional battery energy history")
                 return
+        elif self._has_previous_entities is not None and self._has_previous_entities():
+            # Core can also return None after renaming a corrupt storage file.
+            # An existing entity may still have Recorder history to protect.
+            _LOGGER.warning("Missing history for existing directional battery sensors")
+            return
         self._saved_history = self._history
         self._loaded = True
 
@@ -137,14 +154,9 @@ class DirectionalBatteryEnergy:
         history = self._history
         if self._store is None or history is None or history == self._saved_history:
             return True
-        data = history.as_dict()
         try:
-            await self._store.async_save(data)
-            # Core logs ordinary disk write errors without re-raising.
-            saved = await self._store.async_load()
-        except HomeAssistantError:
-            saved = None
-        if saved != data:
+            await self._store.async_save(history.as_dict())
+        except (HomeAssistantError, OSError):
             self._history = self._saved_history
             _LOGGER.warning("Unable to save directional battery energy history")
             return False

@@ -148,7 +148,7 @@ See the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for insta
 
 - Guided setup with site, device-category, and multi-gateway selection
 - Site and battery energy monitoring for the Home Assistant Energy Dashboard
-- Directional battery energy on the IQ Battery device for compatible sites. Home Assistant 2026.12 can use the four lifetime kWh sensors for energy from the grid and solar into the battery and from the battery to the home and grid. Configure all four together in the Energy Dashboard. The sensors are enabled by default and can be turned off under **Features → Device Features → Enable Directional Battery Energy**.
+- Directional battery energy on the IQ Battery device for compatible sites. Home Assistant 2026.12 can use the four lifetime kWh sensors for energy from the grid and solar into the battery and from the battery to the home and grid. Configure all four together in the Energy Dashboard. The sensors are enabled by default and can be turned off under **Features → Device Features → Enable Directional Battery Energy**. If Enphase reports incomplete or incompatible lifetime history, the directional sensors show unavailable until a consistent response arrives.
 - EV charging controls, actual charging status, and session history
 - Charging and schedule sync actions can target an area or group and exclude individual charger devices.
 - Battery profiles, reserve settings, schedules, and supported PowerMatch controls

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import asyncio
 
 import pytest
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import State
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.components.sensor import recorder as sensor_recorder
@@ -144,6 +145,7 @@ def test_directional_battery_does_not_record_source_corrections(
     hass, coordinator_factory, monkeypatch, original, corrected, recovered
 ):
     coord = coordinator_factory(serials=[])
+    coord.last_update_success = True
     entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
     history = []
     start = datetime(2026, 10, 2, 10, 5, tzinfo=timezone.utc)
@@ -165,7 +167,7 @@ def test_directional_battery_does_not_record_source_corrections(
         history.append(
             State(
                 "sensor.site_energy",
-                str(entity.native_value),
+                str(entity.native_value) if entity.available else STATE_UNAVAILABLE,
                 {
                     "state_class": entity.state_class,
                     "device_class": entity.device_class,
@@ -175,7 +177,12 @@ def test_directional_battery_does_not_record_source_corrections(
                 last_changed=timestamp,
             )
         )
-    assert [state.state for state in history] == ["5.5", "5.5", "5.5", "5.6"]
+    assert [state.state for state in history] == [
+        "5.5",
+        STATE_UNAVAILABLE,
+        STATE_UNAVAILABLE,
+        "5.6",
+    ]
     assert _compile_energy_sum(
         hass, monkeypatch, history, start, baseline=5.5
     ) == pytest.approx(42.1)

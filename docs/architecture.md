@@ -656,9 +656,11 @@ Directional battery energy uses the four reported lifetime Wh arrays as one
 set. Positive directional readings require corroborating charge or discharge
 in the same bucket. The integration saves the closed-bucket sums and the last
 accepted totals before publishing the group. A change to closed energy or a
-decrease in any previously counted direction holds the group at its last
-accepted values. The IQ Battery sensors retain Wh precision. The Device Features
-option disables the registry entries while retaining entity IDs and history.
+decrease in an already counted direction makes the group unavailable until a
+consistent response arrives. The same applies if existing directional entities
+lose the stored baseline, since reinitializing them could add old energy to
+Recorder. The IQ Battery sensors retain Wh precision. The Device Features option
+disables the registry entries while retaining entity IDs and history.
 
 Current Grid Power and Current Battery Power reseed their cumulative-energy
 baselines when missing source channels return, including during reload or reauth.

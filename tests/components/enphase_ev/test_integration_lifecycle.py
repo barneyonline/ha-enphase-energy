@@ -253,7 +253,7 @@ async def test_directional_battery_real_platform_lifecycle(
     assert reload.await_count == 2
     assert registry.async_get(grid_id).disabled_by is None
     assert registry.async_get(disabled_id).disabled_by is er.RegistryEntryDisabler.USER
-    assert float(hass.states.get(grid_id).state) == 12.0
+    assert hass.states.get(grid_id).state == STATE_UNAVAILABLE
     freezer.tick(timedelta(seconds=RELOAD_AFTER_UPDATE_DELAY + 1))
     async_fire_time_changed(hass, dt_util.utcnow())
     await hass.async_block_till_done()
@@ -269,10 +269,10 @@ async def test_directional_battery_real_platform_lifecycle(
     )
     assert await hass.config_entries.async_reload(config_entry.entry_id)
     await _finish_startup(hass, config_entry)
-    assert float(hass.states.get(grid_id).state) == 12.0
+    assert hass.states.get(grid_id).state == STATE_UNAVAILABLE
     coord = config_entry.runtime_data.coordinator
 
-    async def publish_grid(bucket: int, *, advance: bool) -> float:
+    async def publish_grid(bucket: int, *, advance: bool) -> str:
         lifetime.update(charge=[300 + bucket], grid_battery=[bucket])
         if advance:
             freezer.tick(timedelta(minutes=5))
@@ -280,21 +280,21 @@ async def test_directional_battery_real_platform_lifecycle(
         await coord.energy._async_refresh_site_energy(force=True)
         coord.async_set_updated_data(dict(coord.data))
         await hass.async_block_till_done()
-        return float(hass.states.get(grid_id).state)
+        return hass.states.get(grid_id).state
 
-    assert await publish_grid(1000, advance=False) == 12.0
-    assert await publish_grid(1000, advance=False) == 12.0
-    assert await publish_grid(12003, advance=True) == 12.003
-    assert await publish_grid(0, advance=True) == 12.003
-    assert await publish_grid(1000, advance=True) == 12.003
-    assert await publish_grid(1000, advance=True) == 12.003
+    assert await publish_grid(1000, advance=False) == STATE_UNAVAILABLE
+    assert await publish_grid(1000, advance=False) == STATE_UNAVAILABLE
+    assert float(await publish_grid(12003, advance=True)) == 12.003
+    assert await publish_grid(0, advance=True) == STATE_UNAVAILABLE
+    assert await publish_grid(1000, advance=True) == STATE_UNAVAILABLE
+    assert await publish_grid(1000, advance=True) == STATE_UNAVAILABLE
     assert "last_reset_at" not in hass.states.get(grid_id).attributes
     lifetime.update(grid_battery=[11_900], solar_battery=[403], charge=[12_303])
     await coord.energy._async_refresh_site_energy(force=True)
     coord.async_set_updated_data(dict(coord.data))
     solar_id = ids["battery_energy_from_solar"]
-    assert float(hass.states.get(grid_id).state) == 12.003
-    assert float(hass.states.get(solar_id).state) == 0.3
+    assert hass.states.get(grid_id).state == STATE_UNAVAILABLE
+    assert hass.states.get(solar_id).state == STATE_UNAVAILABLE
     lifetime["solar_battery"] = [300]
 
     # Reject a shifted history before the first platform state write on reload.
@@ -304,11 +304,28 @@ async def test_directional_battery_real_platform_lifecycle(
     assert await hass.config_entries.async_reload(config_entry.entry_id)
     await _finish_startup(hass, config_entry)
     coord = config_entry.runtime_data.coordinator
-    assert float(hass.states.get(grid_id).state) == 12.003
-    assert await publish_grid(24_000, advance=True) == 12.003
-    assert await publish_grid(24_001, advance=True) == 12.003
+    assert hass.states.get(grid_id).state == STATE_UNAVAILABLE
+    assert await publish_grid(24_000, advance=True) == STATE_UNAVAILABLE
+    assert await publish_grid(24_001, advance=True) == STATE_UNAVAILABLE
     lifetime["start_date"] = "2026-09-05"
-    assert await publish_grid(12_004, advance=True) == 12.004
+    assert float(await publish_grid(12_004, advance=True)) == 12.004
+
+    # Core reports storage loss as an empty store. Existing entity IDs cannot
+    # safely treat a rerouted historical total as a fresh Recorder baseline.
+    store = directional_battery_store(hass, config_entry.entry_id)
+    history = await store.async_load()
+    assert history
+    await store.async_remove()
+    lifetime.update(grid_battery=[12_104], solar_battery=[200], charge=[12_304])
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    coord = config_entry.runtime_data.coordinator
+    assert hass.states.get(grid_id).state == STATE_UNAVAILABLE
+    assert hass.states.get(solar_id).state == STATE_UNAVAILABLE
+    assert await store.async_load() is None
+    await store.async_save(history)
+    lifetime["solar_battery"] = [300]
+    assert float(await publish_grid(12_005, advance=True)) == 12.005
 
     assert all(registry.async_get(entity_id) is not None for entity_id in ids.values())
     assert not unexpected, ", ".join(unexpected)
