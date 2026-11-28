@@ -970,6 +970,8 @@ Notes:
 - Arrays are long. The implementation treats missing or zero-only `evse`, `heatpump`, and `water_heater` channels as absent unless they came from the HEMS lifetime fallback.
 - The integration can merge `/systems/<site_id>/hems_consumption_lifetime` into this lifetime payload. Grid and battery flows may also be derived from component flows when direct channels are absent.
 - When present, `evse` values report charging energy attributed to the EVSE.
+- The four directional battery arrays report grid-to-battery (`grid_battery`), solar-to-battery (`solar_battery`), battery-to-home (`battery_home`), and battery-to-grid (`battery_grid`) energy in Wh per bucket. Directional totals sum those buckets independently. The direct charge and discharge arrays cross-check attribution where there are positive aggregate readings. Captured daily buckets showed small differences between the direct and directional totals, including in the current partial day.
+- Directional lifetime sensors require aligned observations through the latest bucket and keep the last accepted totals if later responses lose part of the established history. A numeric zero is distinct from a null or absent bucket. Where an entire charge or discharge pair is zero, a direct zero during reporting must corroborate the pair.
 
 ### 2.8.1 Site Today Snapshot (Quarter-Hour Energy + Battery Context)
 ```

@@ -32,6 +32,9 @@ from custom_components.enphase_ev.sensor import (
     _SiteLifetimePowerRestoreData,
     _lifetime_energy_delta,
 )
+from custom_components.enphase_ev.sensor_site_energy import (
+    _DirectionalBatteryRestoreData,
+)
 
 from .device_info_helpers import device_info_fields
 
@@ -79,6 +82,7 @@ def test_directional_battery_zero_history_requires_observations(
     coordinator_factory, has_aggregates
 ) -> None:
     payload = {
+        "start_date": "2023-08-10",
         "last_report_date": 1_700_000_001,
         **dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), [0]),
     }
@@ -94,23 +98,57 @@ def test_directional_battery_zero_history_requires_observations(
     assert all(flows[key].value_kwh == 0 for key in directions)
 
 
+@pytest.mark.parametrize("leading_total", [None, 0])
 def test_directional_battery_allows_leading_zero_and_null_history(
-    coordinator_factory,
+    coordinator_factory, leading_total
 ) -> None:
     payload = {
+        "start_date": "2023-08-10",
         "last_report_date": 1_700_000_001,
         "grid_battery": [0, None, 441],
         "solar_battery": [0, None, 0],
         "battery_home": [0, None, 221],
         "battery_grid": [0, None, 0],
-        "charge": [None, None, 443],
-        "discharge": [None, None, 221],
+        "charge": [leading_total, None, 443],
+        "discharge": [leading_total, None, 221],
     }
     parsed = coordinator_factory().energy._aggregate_site_energy(
         payload
     )  # noqa: SLF001
     assert parsed is not None
     assert parsed[0].keys() >= DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+
+
+def test_directional_battery_ignores_leading_zero_as_support_for_inactive_pair(
+    coordinator_factory,
+) -> None:
+    payload = {
+        "start_date": "2023-08-10",
+        "last_report_date": 1_700_000_001,
+        "grid_battery": [0, 0],
+        "solar_battery": [0, 0],
+        "battery_home": [0, 221],
+        "battery_grid": [0, 0],
+        "charge": [0, None],
+        "discharge": [0, 221],
+    }
+    flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
+    assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    payload["charge"] = [0, 0]
+    flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
+    assert flows.keys() >= DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+
+
+def test_directional_battery_accepts_direct_zero_dropout_and_empty_padding(
+    coordinator_factory, directional_battery_payload
+) -> None:
+    payload = {
+        **directional_battery_payload,
+        "charge": [None, 3510, 0, None],
+        "discharge": [None, 1301, 902, None],
+    }
+    flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
+    assert flows["battery_energy_from_grid"].value_kwh == 2.952
 
 
 def test_directional_battery_boolean_does_not_become_measured_zero(
@@ -129,6 +167,30 @@ def test_directional_battery_boolean_does_not_become_measured_zero(
 @pytest.mark.parametrize(
     "overrides",
     [
+        {"directional_battery_start_date": None},
+        {"directional_battery_start_date": "2023-02-30"},
+        {"directional_battery_bucket_count": True},
+        {"directional_battery_complete_from": False},
+        {"directional_battery_complete_from": 3},
+    ],
+)
+def test_directional_battery_ignores_invalid_restore_metadata(overrides) -> None:
+    assert (
+        _DirectionalBatteryRestoreData.restored_history(
+            {
+                "directional_battery_start_date": "2023-08-10",
+                "directional_battery_bucket_count": 3,
+                "directional_battery_complete_from": 1,
+                **overrides,
+            }
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
         {"solar_battery": None},
         {"battery_grid": []},
         {"solar_battery": [750, 320]},
@@ -136,6 +198,11 @@ def test_directional_battery_boolean_does_not_become_measured_zero(
         {"grid_battery": [None, 2750, -1]},
         {"grid_battery": [None, None, 202]},
         {"charge": [1000, 3510, 522]},
+        {"charge": [None, 3510, 522, 100]},
+        {"discharge": [None, 1301, 902, 0]},
+        {"grid_battery": [None, 2750, 40_000]},
+        {"grid_battery": [None, 2750, 1], "solar_battery": [None, 750, 1]},
+        {"grid_battery": [None, 2750, 40_000], "solar_battery": [None, 750, 0]},
         {"battery_home": [None, 0, 0]},
         {"grid_battery": [None, 2750, 0], "solar_battery": [None, 750, 0]},
         {"grid_battery": [None, 2750, 1], "solar_battery": [None, 750, 0]},
@@ -148,6 +215,8 @@ def test_directional_battery_boolean_does_not_become_measured_zero(
             "battery_grid": [0, None, 0],
         },
         {"last_report_date": None},
+        {"start_date": None},
+        {"start_date": "2023-02-30"},
         {"update_pending": True},
     ],
 )
@@ -161,6 +230,42 @@ def test_site_energy_holds_back_incomplete_directional_battery_set(
     flows, _ = parsed
     assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
     assert {"battery_charge", "battery_discharge"} <= flows.keys()
+
+
+@pytest.mark.parametrize("variant", ["shifted-origin", "shorter", "lost-leading-data"])
+def test_directional_battery_requires_previously_accepted_coverage(
+    coordinator_factory, directional_battery_payload, variant
+) -> None:
+    manager = coordinator_factory().energy
+    payload = {**directional_battery_payload, "production": [1]}
+    keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    manager.site_energy, _ = manager._aggregate_site_energy(payload)
+    assert manager.site_energy.keys() >= keys
+    if variant == "shifted-origin":
+        incomplete = {**payload, "start_date": "2023-08-11"}
+    elif variant == "shorter":
+        incomplete = {
+            key: (
+                value[:-1] if isinstance(value, list) and key != "production" else value
+            )
+            for key, value in payload.items()
+        }
+    else:
+        incomplete = {
+            key: (
+                [None, None, value[-1]]
+                if isinstance(value, list) and len(value) == 3
+                else value
+            )
+            for key, value in payload.items()
+        }
+    for timestamp in (1_700_000_301, 1_700_000_601):
+        incomplete["last_report_date"] = timestamp
+        manager.site_energy, _ = manager._aggregate_site_energy(incomplete)
+        assert not manager.site_energy.keys() & keys
+    manager.site_energy, _ = manager._aggregate_site_energy(payload)
+    assert manager.site_energy.keys() >= keys
+    assert manager.site_energy["battery_energy_from_grid"].value_kwh == 2.952
 
 
 def test_site_energy_aggregation_with_fallbacks(coordinator_factory) -> None:

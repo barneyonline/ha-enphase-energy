@@ -72,7 +72,6 @@ DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED = False
 DEFAULT_MICROINVERTER_POWER_ENABLED = False
 DEFAULT_PRICING_EDITS_ENABLED = True
 
-# Charge directions first, then discharge directions.
 DIRECTIONAL_BATTERY_ENERGY_FIELDS = {
     "battery_energy_from_grid": "grid_battery",
     "battery_energy_from_solar": "solar_battery",

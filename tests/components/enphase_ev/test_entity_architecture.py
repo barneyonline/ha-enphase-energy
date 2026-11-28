@@ -10,6 +10,7 @@ from homeassistant.core import State
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.components.sensor import recorder as sensor_recorder
 from custom_components.enphase_ev.sensor import (
+    EnphaseDirectionalBatteryEnergySensor,
     EnphaseInverterLifetimeEnergySensor,
     EnphaseSiteEnergySensor,
 )
@@ -26,6 +27,30 @@ from custom_components.enphase_ev.inverter_inventory import (
 from custom_components.enphase_ev.sensor_snapshot_helpers import restore_power_w
 
 from .device_info_helpers import device_info_fields
+
+
+def _compile_energy_sum(hass, monkeypatch, history, start, *, baseline):
+    monkeypatch.setattr(sensor_recorder, "_get_sensor_states", lambda _: [history[-1]])
+    monkeypatch.setattr(sensor_recorder, "get_instance", lambda _: MagicMock())
+    monkeypatch.setattr(
+        sensor_recorder.history,
+        "get_full_significant_states_with_session",
+        lambda *a, **k: {"sensor.site_energy": history},
+    )
+    monkeypatch.setattr(
+        sensor_recorder.statistics, "get_metadata_with_session", lambda *a, **k: {}
+    )
+    monkeypatch.setattr(
+        sensor_recorder.statistics,
+        "get_latest_short_term_statistics_with_session",
+        lambda *a, **k: {
+            "sensor.site_energy": [{"state": baseline, "sum": 42.0, "last_reset": None}]
+        },
+    )
+    result = sensor_recorder.compile_statistics(
+        hass, MagicMock(), start, start + timedelta(minutes=5), {}
+    )
+    return result.platform_stats[0]["stat"]["sum"]
 
 
 @pytest.mark.parametrize("flow", ["grid_export", "grid_import", "solar_production"])
@@ -93,27 +118,9 @@ async def test_site_energy_recorder_preserves_restored_total(
     assert [state.state for state in history] == expected_states
     assert entity.state_class == SensorStateClass.TOTAL_INCREASING
 
-    monkeypatch.setattr(sensor_recorder, "_get_sensor_states", lambda _: [history[-1]])
-    monkeypatch.setattr(sensor_recorder, "get_instance", lambda _: MagicMock())
-    monkeypatch.setattr(
-        sensor_recorder.history,
-        "get_full_significant_states_with_session",
-        lambda *a, **k: {"sensor.site_energy": history},
-    )
-    monkeypatch.setattr(
-        sensor_recorder.statistics, "get_metadata_with_session", lambda *a, **k: {}
-    )
-    monkeypatch.setattr(
-        sensor_recorder.statistics,
-        "get_latest_short_term_statistics_with_session",
-        lambda *a, **k: {
-            "sensor.site_energy": [{"state": 19753.49, "sum": 42.0, "last_reset": None}]
-        },
-    )
-    result = sensor_recorder.compile_statistics(
-        hass, MagicMock(), start, start + timedelta(minutes=5), {}
-    )
-    assert result.platform_stats[0]["stat"]["sum"] == pytest.approx(expected_sum)
+    assert _compile_energy_sum(
+        hass, monkeypatch, history, start, baseline=19753.49
+    ) == pytest.approx(expected_sum)
     assert "sensor.site_energy" not in hass.data.get(sensor_recorder.SEEN_DIP, set())
     assert "not strictly increasing" not in caplog.text
 
@@ -121,6 +128,56 @@ async def test_site_energy_recorder_preserves_restored_total(
     coord.energy.site_energy = {}
     assert entity.native_value == float(expected_states[-1])
     assert entity.extra_restore_state_data.native_value == float(expected_states[-1])
+
+
+@pytest.mark.parametrize(
+    ("lower", "expected_states", "expected_sum"),
+    [
+        (5.0, ["5.5", "5.5", "5.5", "5.6"], 42.1),
+        (4.95, ["5.5", "5.5", "5.5", "5.6"], 42.1),
+        (4.9, ["5.5", "5.5", "4.9", "5.6"], 47.6),
+    ],
+)
+def test_directional_battery_only_accepts_recorder_resets(
+    hass, coordinator_factory, monkeypatch, lower, expected_states, expected_sum
+):
+    coord = coordinator_factory(serials=[])
+    entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
+    history = []
+    start = datetime(2026, 10, 2, 10, 5, tzinfo=timezone.utc)
+    for index, value in enumerate((5.5, lower, lower, 5.6)):
+        bucket = round(value * 1000)
+        timestamp = start + timedelta(seconds=index)
+        coord.energy.site_energy, _ = coord.energy._aggregate_site_energy(
+            {
+                "start_date": "2026-10-02",
+                "last_report_date": timestamp.timestamp(),
+                "grid_battery": [bucket],
+                "solar_battery": [0],
+                "battery_home": [0],
+                "battery_grid": [0],
+                "charge": [bucket],
+                "discharge": [0],
+            }
+        )
+        history.append(
+            State(
+                "sensor.site_energy",
+                str(entity.native_value),
+                {
+                    "state_class": entity.state_class,
+                    "device_class": entity.device_class,
+                    "unit_of_measurement": entity.native_unit_of_measurement,
+                    **entity.extra_state_attributes,
+                },
+                last_changed=timestamp,
+            )
+        )
+    assert [state.state for state in history] == expected_states
+    assert _compile_energy_sum(
+        hass, monkeypatch, history, start, baseline=5.5
+    ) == pytest.approx(expected_sum)
+    assert "sensor.site_energy" not in hass.data.get(sensor_recorder.SEEN_DIP, set())
 
 
 @pytest.mark.parametrize(

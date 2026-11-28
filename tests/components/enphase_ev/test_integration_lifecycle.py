@@ -286,6 +286,21 @@ async def test_directional_battery_real_platform_lifecycle(
     assert await publish_grid(1000, advance=True) == 12.003
     assert await publish_grid(1000, advance=True) == 1.0
     assert hass.states.get(grid_id).attributes["last_reset_at"]
+
+    # A changed history can already be in the coordinator's cache when the
+    # sensors restore. Even a higher value from that range must stay out.
+    lifetime["start_date"] = "2026-09-06"
+    lifetime["grid_battery"] = [2400]
+    lifetime["charge"] = [2700]
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    coord = config_entry.runtime_data.coordinator
+    assert float(hass.states.get(grid_id).state) == 1.0
+    assert await publish_grid(2400, advance=True) == 1.0
+    assert await publish_grid(2401, advance=True) == 1.0
+    lifetime["start_date"] = "2026-09-05"
+    assert await publish_grid(1500, advance=True) == 1.5
+
     assert all(registry.async_get(entity_id) is not None for entity_id in ids.values())
     assert not unexpected, ", ".join(unexpected)
     assert await hass.config_entries.async_unload(config_entry.entry_id)

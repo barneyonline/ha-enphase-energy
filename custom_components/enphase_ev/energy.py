@@ -6,7 +6,7 @@ import math
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from datetime import timezone as _tz
 from typing import Callable, Iterable, Protocol, runtime_checkable
 
@@ -32,12 +32,18 @@ SITE_ENERGY_DEFAULT_INTERVAL_MIN = 5.0
 SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
 DEVICE_LIFETIME_CHANNELS: tuple[str, ...] = ("evse", "heatpump", "water_heater")
-# Cross-check rows with a zero direction without relying on exact Enphase
-# aggregate totals. Observed one-zero daily residuals reached 38 Wh, and
-# quarter-hour rounding can account for 1 Wh.
+# Daily rounding and attribution can differ from the direct aggregate.
+# Observed one-zero daily residuals reached 38 Wh, and both-positive
+# residuals reached 3.17%. Quarter-hour rounding can account for 1 Wh.
 BATTERY_DIRECTION_ZERO_PAIR_TOLERANCE_WH = 1.0
-BATTERY_DIRECTION_SINGLE_ZERO_TOLERANCE_WH = 50.0
-BATTERY_DIRECTION_SINGLE_ZERO_TOLERANCE_RATIO = 0.05
+BATTERY_DIRECTION_TOLERANCE_WH = 50.0
+BATTERY_DIRECTION_TOLERANCE_RATIO = 0.05
+BATTERY_DIRECTION_AGGREGATE_PAIRS = {
+    "charge": ("grid_battery", "solar_battery"),
+    "discharge": ("battery_home", "battery_grid"),
+}
+# Recorder recognizes a TOTAL_INCREASING reset only below this ratio.
+RECORDER_RESET_RATIO = 0.9
 HEMS_DEVICE_CHANNELS_META_KEY = "_hems_device_channels"
 HEMS_DEVICE_METADATA_KEY = "_hems_device_metadata"
 
@@ -62,6 +68,22 @@ class LifetimeGuardState:
     pending_ts: float | None = None
     pending_count: int = 0
     pending_source: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DirectionalBatteryHistory:
+    """Coverage of a lifetime response, including its missing leading buckets."""
+
+    start_date: date
+    bucket_count: int
+    complete_from: int
+
+    def covers(self, previous: DirectionalBatteryHistory) -> bool:
+        return (
+            self.start_date == previous.start_date
+            and self.bucket_count >= previous.bucket_count
+            and self.complete_from <= previous.complete_from
+        )
 
 
 @dataclass(slots=True)
@@ -120,6 +142,7 @@ class EnergyManager:
         self._site_energy_cache_ttl: float = SITE_ENERGY_CACHE_TTL
         self._site_energy_guard: dict[str, LifetimeGuardState] = {}
         self._site_energy_last_reset: dict[str, str | None] = {}
+        self.directional_battery_history: DirectionalBatteryHistory | None = None
         self._site_energy_force_refresh = False
         self._site_energy_refresh_lock = asyncio.Lock()
         self._site_energy_completed_attempts = 0
@@ -408,83 +431,91 @@ class EnergyManager:
         return total, count
 
     def _directional_battery_bucket_totals(
-        self, payload: dict[str, object]
-    ) -> dict[str, tuple[float, int]]:
+        self, payload: dict[str, object], start_date: date
+    ) -> tuple[dict[str, tuple[float, int]], DirectionalBatteryHistory] | None:
         """Accept the four directions as a set with aligned observations."""
-        fields = tuple(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values())
-        series: list[list[object]] = []
-        for field in fields:
+        series: dict[str, list[object]] = {}
+        size = 0
+        for field in DIRECTIONAL_BATTERY_ENERGY_FIELDS.values():
             values = payload.get(field)
             if (
                 not isinstance(values, list)
                 or not values
-                or (series and len(values) != len(series[0]))
+                or (size and len(values) != size)
                 or self._coerce_lifetime_bucket(values[-1]) is None
             ):
-                return {}
-            series.append(values)
+                return None
+            size = len(values)
+            series[field] = values
 
-        charge = payload.get("charge")
-        discharge = payload.get("discharge")
-        direct_pairs = (
-            charge if isinstance(charge, list) else [],
-            discharge if isinstance(discharge, list) else [],
-        )
-        totals = dict.fromkeys(fields, 0.0)
-        aggregate_zero_seen = [False, False]
+        aggregates: dict[str, list[object]] = {}
+        for key in BATTERY_DIRECTION_AGGREGATE_PAIRS:
+            values = payload.get(key)
+            if isinstance(values, list):
+                if any(
+                    self._coerce_lifetime_bucket(value) is not None
+                    for value in values[size:]
+                ):
+                    return None
+                aggregates[key] = values
+
+        totals = dict.fromkeys(series, 0.0)
+        aggregate_zero_seen: set[str] = set()
         reporting_started = False
+        complete_from = 0
         count = 0
-        for index, row in enumerate(zip(*series, strict=True)):
-            samples = [self._coerce_lifetime_bucket(value) for value in row]
-            reported = [sample for sample in samples if sample is not None]
-            direct = [
-                (
-                    self._coerce_lifetime_bucket(values[index])
-                    if index < len(values)
-                    else None
-                )
-                for values in direct_pairs
-            ]
+        for index in range(size):
+            reported = {
+                field: sample
+                for field, values in series.items()
+                if (sample := self._coerce_lifetime_bucket(values[index])) is not None
+            }
+            direct = {
+                key: total
+                for key, values in aggregates.items()
+                if index < len(values)
+                and (total := self._coerce_lifetime_bucket(values[index])) is not None
+            }
             if not reported:
                 # The source can alternate zeros and nulls before measurable
                 # battery activity begins.
-                if reporting_started or any(
-                    total is not None and total > 0 for total in direct
-                ):
-                    return {}
+                if reporting_started or any(direct.values()):
+                    return None
+                complete_from = index + 1
                 continue
-            if len(reported) != len(fields):
-                return {}
-            reporting_started |= any(reported) or any(
-                total is not None for total in direct
-            )
-            for pair_index, total in enumerate(direct):
-                if total is None:
+            if len(reported) != len(series):
+                return None
+            reporting_started |= any(reported.values()) or any(direct.values())
+            for key, total in direct.items():
+                left, right = BATTERY_DIRECTION_AGGREGATE_PAIRS[key]
+                pair_total = reported[left] + reported[right]
+                if total == 0:
+                    # Direct aggregates can drop to zero while the component
+                    # flows continue reporting. Only corroborate paired zeros
+                    # during activity or in the latest bucket of an idle site.
+                    if not pair_total and (reporting_started or index == size - 1):
+                        aggregate_zero_seen.add(key)
                     continue
-                left, right = reported[pair_index * 2 : pair_index * 2 + 2]
-                if left and right:
-                    continue
-                pair_total = left + right
                 tolerance = (
                     max(
-                        BATTERY_DIRECTION_SINGLE_ZERO_TOLERANCE_WH,
-                        total * BATTERY_DIRECTION_SINGLE_ZERO_TOLERANCE_RATIO,
+                        BATTERY_DIRECTION_TOLERANCE_WH,
+                        total * BATTERY_DIRECTION_TOLERANCE_RATIO,
                     )
                     if pair_total
                     else BATTERY_DIRECTION_ZERO_PAIR_TOLERANCE_WH
                 )
-                if total - pair_total > tolerance:
-                    return {}
-                if total == 0:
-                    aggregate_zero_seen[pair_index] = True
-            for field, sample in zip(fields, reported, strict=True):
+                if abs(total - pair_total) > tolerance:
+                    return None
+            for field, sample in reported.items():
                 totals[field] += sample
             count += 1
-        for pair_index, observed_zero in enumerate(aggregate_zero_seen):
-            left_field, right_field = fields[pair_index * 2 : pair_index * 2 + 2]
-            if not (totals[left_field] or totals[right_field] or observed_zero):
-                return {}
-        return {field: (total, count) for field, total in totals.items()}
+        for key, (left, right) in BATTERY_DIRECTION_AGGREGATE_PAIRS.items():
+            if not (totals[left] or totals[right] or key in aggregate_zero_seen):
+                return None
+        return (
+            {field: (total, count) for field, total in totals.items()},
+            DirectionalBatteryHistory(start_date, size, complete_from),
+        )
 
     def _latest_energy_buckets(
         self, values: object
@@ -643,8 +674,13 @@ class EnergyManager:
             state.pending_count = 0
             return last, None
 
-        is_reset_candidate = drop >= LIFETIME_RESET_DROP_THRESHOLD_KWH and (
-            value <= LIFETIME_RESET_FLOOR_KWH or value <= (last * LIFETIME_RESET_RATIO)
+        is_reset_candidate = (
+            drop >= LIFETIME_RESET_DROP_THRESHOLD_KWH
+            and (
+                value <= LIFETIME_RESET_FLOOR_KWH
+                or value <= (last * LIFETIME_RESET_RATIO)
+            )
+            and (reset_source is None or value < last * RECORDER_RESET_RATIO)
         )
         if is_reset_candidate:
             now = time.monotonic()
@@ -693,9 +729,23 @@ class EnergyManager:
         return last, None
 
     def restore_directional_battery_baseline(
-        self, flow: str, value: float, last_reset_at: str | None
+        self,
+        flow: str,
+        value: float,
+        last_reset_at: str | None,
+        history: DirectionalBatteryHistory | None,
     ) -> None:
         """Reinstate the recorder baseline before confirming any directional reset."""
+        if history is not None and (
+            self.directional_battery_history is None
+            or not self.directional_battery_history.covers(history)
+        ):
+            # First refresh precedes entity restore. Reject a shorter history
+            # even if this coordinator provisionally published it in its cache.
+            self.directional_battery_history = history
+            for direction in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
+                self.site_energy.pop(direction, None)
+                self._site_energy_guard.pop(direction, None)
         confirmed_reset = self._site_energy_last_reset.get(flow)
         if confirmed_reset is not None and confirmed_reset != last_reset_at:
             return
@@ -724,11 +774,24 @@ class EnergyManager:
         flows: dict[str, SiteEnergyFlow] = {}
         interval_minutes = self._site_energy_interval_minutes(payload)
         totals = dict(device_totals or {})
-        directional_totals = (
-            self._directional_battery_bucket_totals(payload)
-            if last_report_date is not None and not update_pending
-            else {}
-        )
+        directional_totals: dict[str, tuple[float, int]] = {}
+        if (
+            start_date is not None
+            and last_report_date is not None
+            and not update_pending
+        ):
+            battery_start = dt_util.parse_date(start_date)
+            if battery_start is not None:
+                battery = self._directional_battery_bucket_totals(
+                    payload, battery_start
+                )
+                if battery is not None:
+                    direction_totals, history = battery
+                    previous = self.directional_battery_history
+                    if previous is None or history.covers(previous):
+                        directional_totals = direction_totals
+                        if apply_guards:
+                            self.directional_battery_history = history
         totals.update(directional_totals)
 
         def bucket_total(field: str) -> tuple[float, int]:
