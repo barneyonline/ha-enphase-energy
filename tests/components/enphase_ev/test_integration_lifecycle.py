@@ -6,7 +6,7 @@ from datetime import timedelta
 from http import HTTPStatus
 import inspect
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 
 from aiohttp import ClientResponseError, RequestInfo
 import pytest
@@ -39,6 +39,7 @@ from custom_components.enphase_ev.const import (
     CONF_SITE_ONLY,
     DIRECTIONAL_BATTERY_ENERGY_FIELDS,
     DOMAIN,
+    ISSUE_BATTERY_PROFILE_PENDING,
     OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_WEATHER_ENABLED,
@@ -979,6 +980,85 @@ async def test_charge_mode_preference_refresh_reaches_both_entities(
         assert preference_requests.await_count == previous_reads + 1
         calls["set_charge_mode"].assert_not_awaited()
         calls["patch_schedules"].assert_not_awaited()
+        assert unexpected == []
+    finally:
+        assert await hass.config_entries.async_unload(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+
+@pytest.mark.session_history_real
+async def test_overdue_reserve_repair_opens_on_coordinator_refresh(
+    hass, config_entry, platform_cloud, freezer
+):
+    responses, calls, unexpected = platform_cloud
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data={
+            **config_entry.data,
+            CONF_SELECTED_TYPE_KEYS: ["envoy", "encharge"],
+            CONF_SERIALS: [],
+            CONF_SITE_ONLY: True,
+        },
+    )
+    responses["devices_inventory"]["result"].append(
+        {"type": "encharge", "devices": [{"serial_number": "BAT-A"}]}
+    )
+    responses["battery_site_settings"] = {
+        "data": {
+            "hasEncharge": True,
+            "showBatteryBackupPercentage": True,
+            "userDetails": {"isOwner": True},
+        }
+    }
+    responses["storm_guard_profile"] = {
+        "data": {"profile": "self-consumption", "batteryBackupPercentage": 20}
+    }
+    responses["battery_status"] = {
+        "storages": [
+            {
+                "serial_number": "BAT-A",
+                "current_charge": 90,
+                "battery_mode": "Self-Consumption",
+                "last_report": dt_util.utcnow().timestamp(),
+            }
+        ]
+    }
+    responses["set_battery_settings_compat"] = {}
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    try:
+        await _finish_startup(hass, config_entry)
+        coord = config_entry.runtime_data.coordinator
+        reserve_id = er.async_get(hass).async_get_entity_id(
+            "number", DOMAIN, f"{DOMAIN}_site_{coord.site_id}_battery_reserve"
+        )
+        assert reserve_id is not None
+        assert float(hass.states.get(reserve_id).state) == 20
+        responses["storm_guard_profile"]["data"].pop("batteryBackupPercentage")
+        responses["battery_settings_details"] = {
+            "data": {"profile": "self-consumption", "batteryBackupPercentage": 30}
+        }
+        await hass.services.async_call(
+            "number", "set_value", {"entity_id": reserve_id, "value": 30}, blocking=True
+        )
+
+        issue_id = f"{ISSUE_BATTERY_PROFILE_PENDING}_{config_entry.entry_id.lower()}"
+        registry = ir.async_get(hass)
+        assert registry.async_get_issue(DOMAIN, issue_id) is None
+        freezer.tick(timedelta(seconds=601))
+        responses["battery_status"]["storages"][0][
+            "last_report"
+        ] = dt_util.utcnow().timestamp()
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+
+        assert registry.async_get_issue(DOMAIN, issue_id) is not None
+        assert float(hass.states.get(reserve_id).state) == 20
+        calls["set_battery_settings_compat"].assert_awaited_once_with(
+            {"batteryBackupPercentage": 30},
+            merged_payload=True,
+            strip_devices=True,
+            on_accepted_profile=ANY,
+        )
         assert unexpected == []
     finally:
         assert await hass.config_entries.async_unload(config_entry.entry_id)

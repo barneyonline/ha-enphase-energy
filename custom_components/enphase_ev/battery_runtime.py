@@ -125,6 +125,43 @@ class _RepairProfileStage:
     read: tuple[float, int, object] | None = None
 
 
+@dataclass(slots=True)
+class _PendingReserveReadback:
+    expected_subtype: str | None
+    observed_subtype: str | None
+
+
+@dataclass(slots=True)
+class _ReserveProfileReadback:
+    profile: str
+    minimum: int | None = None
+    maximum: int | None = None
+    observed_subtype: str | None = None
+    subtype_observed_mono: float | None = None
+    reserve_write_confirmed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _SettingsReserveLimits:
+    minimum: int | None = None
+    maximum: int | None = None
+    soc_floor: int | None = None
+
+    def with_defaults(self, site: _SettingsReserveLimits) -> _SettingsReserveLimits:
+        return _SettingsReserveLimits(
+            site.minimum if self.minimum is None else self.minimum,
+            site.maximum if self.maximum is None else self.maximum,
+            site.soc_floor if self.soc_floor is None else self.soc_floor,
+        )
+
+    def bounds(self) -> tuple[int, int]:
+        floor = BATTERY_MIN_SOC_FALLBACK if self.soc_floor is None else self.soc_floor
+        return (
+            floor if self.minimum is None else self.minimum,
+            100 if self.maximum is None else self.maximum,
+        )
+
+
 class BatteryRuntime:
     """Battery profile selection and pending-state helpers."""
 
@@ -137,6 +174,18 @@ class BatteryRuntime:
         self.ev_preferences = EVBatteryPreferences(self)
         self.profile_mismatch = BatteryProfileMismatch(self)
         self.storm_guard_stuck_profile = StormGuardStuckProfile(self)
+        self._pending_reserve_readback: _PendingReserveReadback | None = None
+        self._reserve_profile_readback: _ReserveProfileReadback | None = None
+        self._site_settings_reserve_limits = _SettingsReserveLimits()
+        self._profile_settings_reserve_limits: (
+            tuple[str, _SettingsReserveLimits] | None
+        ) = None
+        self._settings_reserve_subtype: tuple[str, str] | None = None
+        self.settings_profile_readback_allowed = True
+        self.reserve_companion_profile_at_submission: str | None = None
+        self._settings_read_sequence = 0
+        self._latest_settings_profile_response = 0
+        self._reserve_write_in_flight = False
         self._settings_reads_in_flight = 0
         self._profile_read_locks = {
             "storm_guard": asyncio.Lock(),
@@ -191,6 +240,259 @@ class BatteryRuntime:
 
     def _coerce_optional_int(self, value: object) -> int | None:
         return coerce_optional_int(value)
+
+    def battery_reserve_readback(
+        self, data: dict[str, object], *, from_profile: bool
+    ) -> int | None:
+        """Return usable reserve feedback for the configured profile."""
+        reserve = coerce_optional_int(data.get("batteryBackupPercentage"))
+        if self._reserve_write_in_flight or reserve is None or not 0 <= reserve <= 100:
+            return None
+        raw_profile = data.get("profile")
+        profile = self._configured_profile_key(raw_profile)
+        if raw_profile is not None and profile is None:
+            return None
+        pending = self._pending_reserve_readback
+        if not from_profile and (
+            pending is not None
+            or self._pending_requires_authoritative_confirmation()
+            or self._settings_profile_is_stale_after_authoritative_read(profile)
+        ):
+            return None
+        if pending is None:
+            configured_profile = profile
+            if configured_profile is None:
+                latest_profile = self._reserve_profile_readback
+                cached_profile = self.battery_state._battery_profile
+                if from_profile or (
+                    latest_profile is not None
+                    and latest_profile.profile == cached_profile
+                ):
+                    configured_profile = cached_profile
+            if configured_profile == "backup_only":
+                return 100
+            limits = self._reserve_readback_for_profile(
+                (configured_profile or "") if from_profile else ""
+            )
+            readback_limits = self._profile_reserve_limits(data, limits)
+            settings_limits = self._settings_limits_for_profile(
+                configured_profile or self.battery_state._battery_profile
+            )
+            if (
+                from_profile
+                and readback_limits == (None, None)
+                and not limits.reserve_write_confirmed
+                and settings_limits == _SettingsReserveLimits()
+            ):
+                return self.normalize_battery_reserve_for_profile(
+                    configured_profile or "self-consumption", reserve
+                )
+            minimum, maximum = self._effective_reserve_readback_limits(
+                readback_limits, settings_limits
+            )
+            return reserve if minimum <= reserve <= maximum else None
+        if profile is None or profile != self.battery_state._battery_pending_profile:
+            return None
+        if profile == "backup_only":
+            return reserve if reserve == 100 else None
+        if profile in {"cost_savings", "ai_optimisation"}:
+            raw_subtype = data.get("operationModeSubType")
+            subtype = (
+                pending.observed_subtype
+                if raw_subtype is None
+                else self._reserve_observed_subtype(raw_subtype)
+            )
+            if not self._pending_subtype_matches(subtype):
+                return None
+        limits = self._reserve_readback_for_profile(profile)
+        min_reserve, max_reserve = self._effective_reserve_readback_limits(
+            self._profile_reserve_limits(data, limits),
+            self._settings_limits_for_profile(profile),
+        )
+        return reserve if min_reserve <= reserve <= max_reserve else None
+
+    def profile_transition_reserve(
+        self, data: dict[str, object], profile: str | None
+    ) -> int | None:
+        """Normalize reserve on a legacy profile or subtype change."""
+        reserve = self._coerce_optional_int(data.get("batteryBackupPercentage"))
+        if reserve is None:
+            return None
+        return self.normalize_battery_reserve_for_profile(
+            profile or self.battery_state._battery_profile or "self-consumption",
+            reserve,
+        )
+
+    def _reserve_readback_for_profile(self, profile: str) -> _ReserveProfileReadback:
+        cached = self._reserve_profile_readback
+        if cached is not None and cached.profile == profile:
+            return cached
+        return _ReserveProfileReadback(profile)
+
+    def _discard_reserve_readback_for_other_profiles(self, profile: str) -> None:
+        readback = self._reserve_profile_readback
+        if readback is not None and readback.profile != profile:
+            self._reserve_profile_readback = None
+        settings_subtype = self._settings_reserve_subtype
+        if settings_subtype is not None and settings_subtype[0] != profile:
+            self._settings_reserve_subtype = None
+        settings_limits = self._profile_settings_reserve_limits
+        if settings_limits is not None and settings_limits[0] != profile:
+            self._profile_settings_reserve_limits = None
+
+    def _note_profile_reserve_readback(
+        self, data: dict[str, object], profile: str | None
+    ) -> None:
+        if profile is not None:
+            self._discard_reserve_readback_for_other_profiles(profile)
+        subtype = self._reserve_observed_subtype(data.get("operationModeSubType"))
+        if profile is None or self._reserve_write_in_flight:
+            if subtype is not None and (
+                profile is not None or data.get("profile") is None
+            ):
+                self._discard_conflicting_reserve_subtypes(subtype)
+            return
+        pending = self._pending_reserve_readback
+        if (
+            pending is not None
+            and profile != self.battery_state._battery_pending_profile
+        ):
+            pending.observed_subtype = None
+            return
+        limits = self._reserve_readback_for_profile(profile)
+        readback_limits = self._profile_reserve_limits(data, limits)
+        minimum, maximum = self._effective_reserve_readback_limits(
+            readback_limits, self._settings_limits_for_profile(profile)
+        )
+        if minimum <= maximum:
+            limits.minimum, limits.maximum = readback_limits
+        if subtype is not None:
+            self._discard_conflicting_settings_subtype(subtype)
+            limits.observed_subtype = subtype
+            limits.subtype_observed_mono = time.monotonic()
+            if pending is not None:
+                pending.observed_subtype = subtype
+        self._reserve_profile_readback = limits
+
+    def _discard_conflicting_reserve_subtypes(self, subtype: str | None) -> None:
+        """Discard subtype evidence contradicted by a Profile response."""
+        readback = self._reserve_profile_readback
+        if readback is not None and readback.observed_subtype != subtype:
+            readback.observed_subtype = None
+            readback.subtype_observed_mono = None
+        self._discard_conflicting_settings_subtype(subtype)
+        pending = self._pending_reserve_readback
+        if pending is not None and pending.observed_subtype != subtype:
+            pending.observed_subtype = None
+
+    def _discard_conflicting_settings_subtype(self, subtype: str | None) -> None:
+        settings_subtype = self._settings_reserve_subtype
+        if settings_subtype is not None and settings_subtype[1] != subtype:
+            self._settings_reserve_subtype = None
+
+    def _profile_reserve_limits(
+        self, data: dict[str, object], cached: _ReserveProfileReadback
+    ) -> tuple[int | None, int | None]:
+        return (
+            self._reserve_readback_bound(
+                data.get("batteryBackupPercentageMin"), cached.minimum
+            ),
+            self._reserve_readback_bound(
+                data.get("batteryBackupPercentageMax"), cached.maximum
+            ),
+        )
+
+    def _effective_reserve_readback_limits(
+        self, limits: tuple[int | None, int | None], settings: _SettingsReserveLimits
+    ) -> tuple[int, int]:
+        lower, upper = limits
+        minimum, maximum = settings.bounds()
+        return (
+            minimum if lower is None else lower,
+            maximum if upper is None else upper,
+        )
+
+    def _reserve_observed_subtype(self, value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        # An explicit empty value is distinct from missing subtype evidence.
+        return "" if value == "" else self._normalize_battery_sub_type(value)
+
+    def _scoped_settings_limits(self, profile: str) -> _SettingsReserveLimits | None:
+        scoped = self._profile_settings_reserve_limits
+        if scoped is not None and scoped[0] == profile:
+            return scoped[1]
+        return None
+
+    def _settings_limits_for_profile(
+        self, profile: str | None
+    ) -> _SettingsReserveLimits:
+        site = self._site_settings_reserve_limits
+        if profile is not None:
+            scoped = self._scoped_settings_limits(profile)
+            if scoped is not None:
+                limits = scoped.with_defaults(site)
+                minimum, maximum = limits.bounds()
+                if minimum <= maximum:
+                    return limits
+        return site
+
+    def _note_settings_reserve_limits(
+        self,
+        profile: str | None,
+        reserve_min: int | None,
+        reserve_max: int | None,
+        soc_floor: int | None,
+    ) -> None:
+        site = self._site_settings_reserve_limits
+        previous = site if profile is None else self._scoped_settings_limits(profile)
+        if previous is None:
+            previous = _SettingsReserveLimits()
+        limits = _SettingsReserveLimits(
+            self._reserve_readback_bound(reserve_min, previous.minimum),
+            self._reserve_readback_bound(reserve_max, previous.maximum),
+            self._reserve_readback_bound(soc_floor, previous.soc_floor),
+        )
+        effective = limits if profile is None else limits.with_defaults(site)
+        minimum, maximum = effective.bounds()
+        if minimum > maximum:
+            return
+        if profile is None:
+            self._site_settings_reserve_limits = limits
+        else:
+            self._profile_settings_reserve_limits = (profile, limits)
+
+    def _configured_reserve_subtype(self, profile: str) -> str | None:
+        readback = self._reserve_profile_readback
+        if (
+            readback is not None
+            and readback.profile == profile
+            and readback.observed_subtype is not None
+        ):
+            return readback.observed_subtype
+        state = self.battery_state
+        if state._battery_profile != profile:
+            return None
+        settings_subtype = self._settings_reserve_subtype
+        if settings_subtype is not None and settings_subtype[0] == profile:
+            return settings_subtype[1]
+        return None
+
+    def _profile_reserve_subtype_is_fresh(self, profile: str) -> bool:
+        observed = self._reserve_readback_for_profile(profile).subtype_observed_mono
+        return observed is not None and (
+            time.monotonic() - observed
+            <= self._battery_profile_refresh_cache_ttl_seconds(
+                BATTERY_SETTINGS_CACHE_TTL
+            )
+        )
+
+    @staticmethod
+    def _reserve_readback_bound(value: object, cached: int | None) -> int | None:
+        bound = coerce_optional_int(value)
+        if bound is not None and 0 <= bound <= 100:
+            return bound
+        return cached
 
     def _coerce_optional_float(self, value: object) -> float | None:
         return coerce_optional_float(value)
@@ -372,6 +674,13 @@ class BatteryRuntime:
             return "ai_optimisation"
         return normalized or None
 
+    def _configured_profile_key(self, value: object) -> str | None:
+        return (
+            self.normalize_battery_profile_key(value)
+            if isinstance(value, str)
+            else None
+        )
+
     def normalize_live_battery_mode_profile(self, value: object) -> str | None:
         if value is None:
             return None
@@ -415,6 +724,7 @@ class BatteryRuntime:
         self, *, clear_optimistic: bool = True, clear_backend_pending: bool = True
     ) -> None:
         state = self.battery_state
+        self._pending_reserve_readback = None
         state._battery_pending_profile = None
         state._battery_pending_reserve = None
         state._battery_pending_sub_type = None
@@ -540,10 +850,17 @@ class BatteryRuntime:
             )
         )
 
-    def _pending_authoritative_confirmation_received(self) -> bool:
+    def _pending_authoritative_confirmation_received(
+        self, *, profile_reserve: int | None = None
+    ) -> bool:
         if not self._pending_requires_authoritative_confirmation():
             return True
         state = self.battery_state
+        if (
+            self._pending_reserve_readback is not None
+            and profile_reserve != state._battery_pending_reserve
+        ):
+            return False
         pending_profile = getattr(state, "_battery_pending_profile", None)
         pending_requested_at = getattr(state, "_battery_pending_requested_at", None)
         live_sample_utc = getattr(state, "_battery_live_profile_sample_utc", None)
@@ -578,15 +895,30 @@ class BatteryRuntime:
             or getattr(state, "_battery_live_profile", None) == pending_profile
         ):
             pending_reserve = getattr(state, "_battery_pending_reserve", None)
+            reserve_readback = self._pending_reserve_readback
             pending_sub_type = self._normalize_battery_sub_type(
                 getattr(state, "_battery_pending_sub_type", None)
             )
+            if reserve_readback is not None:
+                pending_sub_type = reserve_readback.observed_subtype or None
+            self._discard_reserve_readback_for_other_profiles(pending_profile)
+            if (
+                reserve_readback is None
+                and state._battery_pending_require_exact_settings
+                and pending_profile in {"cost_savings", "ai_optimisation"}
+            ):
+                self._discard_conflicting_reserve_subtypes(pending_sub_type or "")
             state._battery_profile = pending_profile
             if pending_reserve is not None:
-                normalized_reserve = self.normalize_battery_reserve_for_profile(
-                    pending_profile,
-                    pending_reserve,
-                )
+                if reserve_readback is not None:
+                    limits = self._reserve_readback_for_profile(pending_profile)
+                    limits.reserve_write_confirmed = True
+                    self._reserve_profile_readback = limits
+                    normalized_reserve = pending_reserve
+                else:
+                    normalized_reserve = self.normalize_battery_reserve_for_profile(
+                        pending_profile, pending_reserve
+                    )
                 state._battery_backup_percentage = normalized_reserve
                 self.remember_battery_reserve(pending_profile, normalized_reserve)
             if pending_profile in {"cost_savings", "ai_optimisation"}:
@@ -624,6 +956,8 @@ class BatteryRuntime:
         reserve: int,
         sub_type: str | None,
         require_exact_settings: bool = True,
+        require_reserve_readback: bool = False,
+        reserve_observed_subtype: str | None = None,
     ) -> None:
         coord = self.coordinator
         state = self.battery_state
@@ -633,6 +967,11 @@ class BatteryRuntime:
             getattr(state, "_battery_profile_read_generation", 0) + 1
         )
         self.profile_mismatch.invalidate()
+        self._pending_reserve_readback = (
+            _PendingReserveReadback(sub_type, reserve_observed_subtype)
+            if require_reserve_readback
+            else None
+        )
         state._battery_pending_profile = profile
         state._battery_pending_reserve = reserve
         state._battery_pending_sub_type = self._normalize_pending_sub_type(
@@ -960,13 +1299,17 @@ class BatteryRuntime:
         return getattr(state, "_battery_cfg_pending_expires_mono", None) is not None
 
     def _battery_control_refresh_success_ttl_seconds(self, default_ttl: float) -> float:
-        if self.control_readback_fast("battery_settings"):
+        if self._reserve_write_in_flight or self.control_readback_fast(
+            "battery_settings"
+        ):
             return 0.0
         if self._battery_control_state_settling():
             return 0.0
         return self._battery_profile_refresh_cache_ttl_seconds(default_ttl)
 
-    def sync_backend_battery_profile_pending(self, value: object) -> None:
+    def sync_backend_battery_profile_pending(
+        self, value: object, *, profile_reserve: int | None = None
+    ) -> None:
         state = self.battery_state
         backend_pending = self._coerce_optional_bool(value)
         if backend_pending is not None:
@@ -981,7 +1324,9 @@ class BatteryRuntime:
             return
         if (
             self.effective_profile_matches_pending()
-            and self._pending_authoritative_confirmation_received()
+            and self._pending_authoritative_confirmation_received(
+                profile_reserve=profile_reserve
+            )
         ):
             self.confirm_battery_pending()
             return
@@ -1022,11 +1367,25 @@ class BatteryRuntime:
             return False
         if pending_profile not in {"cost_savings", "ai_optimisation"}:
             return True
-        pending_subtype = self._normalize_battery_sub_type(
-            getattr(state, "_battery_pending_sub_type", None)
+        if self._pending_reserve_readback is not None:
+            return self._pending_subtype_matches(
+                self._pending_reserve_readback.observed_subtype
+            )
+        return self._pending_subtype_matches(
+            self._normalize_battery_sub_type(
+                getattr(state, "_battery_operation_mode_sub_type", None)
+            )
         )
-        effective_subtype = self._normalize_battery_sub_type(
-            getattr(state, "_battery_operation_mode_sub_type", None)
+
+    def _pending_subtype_matches(self, effective_subtype: str | None) -> bool:
+        reserve_readback = self._pending_reserve_readback
+        if reserve_readback is not None:
+            return effective_subtype is not None and (
+                reserve_readback.expected_subtype is None
+                or reserve_readback.expected_subtype == effective_subtype
+            )
+        pending_subtype = self._normalize_battery_sub_type(
+            getattr(self.battery_state, "_battery_pending_sub_type", None)
         )
         if pending_subtype == SAVINGS_OPERATION_MODE_SUBTYPE:
             return bool(effective_subtype == SAVINGS_OPERATION_MODE_SUBTYPE)
@@ -1076,10 +1435,13 @@ class BatteryRuntime:
         normalized_profile = self.normalize_battery_profile_key(profile)
         if normalized_profile not in {"cost_savings", "ai_optimisation"}:
             return None
-        current_sub_type = self.current_savings_sub_type()
         if normalized_profile == "ai_optimisation":
-            return current_sub_type or SAVINGS_OPERATION_MODE_SUBTYPE
-        return current_sub_type
+            return SAVINGS_OPERATION_MODE_SUBTYPE
+        return self.current_savings_sub_type()
+
+    @staticmethod
+    def _expected_reserve_subtype(profile: str, observed: str | None) -> str | None:
+        return observed if profile in {"cost_savings", "ai_optimisation"} else None
 
     def normalize_battery_reserve_for_profile(self, profile: str, reserve: int) -> int:
         if profile == "backup_only":
@@ -2456,21 +2818,49 @@ class BatteryRuntime:
         normalized_reserve = self.normalize_battery_reserve_for_profile(
             normalized_profile, reserve
         )
-        normalized_sub_type = self.target_operation_mode_sub_type(normalized_profile)
         payload = {"batteryBackupPercentage": normalized_reserve}
+        written_profile: tuple[object, object] | None = None
+
+        def record_written_profile(profile: object, subtype: object) -> None:
+            nonlocal written_profile
+            written_profile = (profile, subtype)
+
         await self.async_assert_battery_profile_write_allowed()
         self.assert_battery_settings_write_allowed()
         async with state._battery_profile_write_lock:
             async with state._battery_settings_write_lock:
+                # Snapshot the configured profile at dispatch. Live
+                # telemetry can still be on a different mode.
+                pending_profile = (
+                    state._battery_profile if require_exact_pending_match else None
+                ) or normalized_profile
+                observed_subtype_at_dispatch = None
+                if require_exact_pending_match:
+                    observed_subtype_at_dispatch = self._configured_reserve_subtype(
+                        pending_profile
+                    )
+                    normalized_sub_type = self._expected_reserve_subtype(
+                        pending_profile, observed_subtype_at_dispatch
+                    )
+                else:
+                    normalized_sub_type = self.target_operation_mode_sub_type(
+                        pending_profile
+                    )
                 state._battery_profile_last_write_mono = time.monotonic()
                 state._battery_settings_last_write_mono = (
                     state._battery_profile_last_write_mono
                 )
+                self._reserve_write_in_flight = require_exact_pending_match
                 try:
                     await coord.client.set_battery_settings_compat(
                         payload,
                         merged_payload=True,
                         strip_devices=True,
+                        on_accepted_profile=(
+                            record_written_profile
+                            if require_exact_pending_match
+                            else None
+                        ),
                     )
                 except aiohttp.ClientResponseError as err:
                     if err.status == HTTPStatus.FORBIDDEN:
@@ -2500,17 +2890,47 @@ class BatteryRuntime:
                             ),
                         )
                     raise
+                finally:
+                    self._reserve_write_in_flight = False
+        if (
+            observed_subtype_at_dispatch is not None
+            and self._configured_reserve_subtype(pending_profile)
+            != observed_subtype_at_dispatch
+        ):
+            observed_subtype_at_dispatch = None
+            normalized_sub_type = self._expected_reserve_subtype(pending_profile, None)
+        if written_profile is not None:
+            sent_profile, sent_subtype = written_profile
+            accepted_profile = self._configured_profile_key(sent_profile)
+            if accepted_profile is not None:
+                if accepted_profile != pending_profile:
+                    observed_subtype_at_dispatch = None
+                    normalized_sub_type = self._expected_reserve_subtype(
+                        accepted_profile, None
+                    )
+                pending_profile = accepted_profile
+            if pending_profile in {"cost_savings", "ai_optimisation"} and isinstance(
+                sent_subtype, str
+            ):
+                accepted_subtype = self._reserve_observed_subtype(sent_subtype)
+                if accepted_subtype is not None:
+                    normalized_sub_type = accepted_subtype
+        controls = getattr(coord, "control_updates", None)
+        if controls is not None:
+            controls.invalidate_observations("battery_reserve")
         self.parse_battery_settings_payload(
             payload,
             clear_missing_schedule_times=False,
             clear_missing_reserve_bounds=False,
         )
-        self.remember_battery_reserve(normalized_profile, normalized_reserve)
+        self.remember_battery_reserve(pending_profile, normalized_reserve)
         self.set_battery_pending(
-            profile=normalized_profile,
+            profile=pending_profile,
             reserve=normalized_reserve,
             sub_type=normalized_sub_type,
             require_exact_settings=require_exact_pending_match,
+            require_reserve_readback=require_exact_pending_match,
+            reserve_observed_subtype=observed_subtype_at_dispatch,
         )
         state._storm_guard_cache_until = None
         state._battery_settings_cache_until = None
@@ -2793,9 +3213,17 @@ class BatteryRuntime:
         if not isinstance(data, dict):
             data = payload
 
-        profile = self.normalize_battery_profile_key(data.get("profile"))
-        reserve = self._coerce_optional_int(data.get("batteryBackupPercentage"))
-        subtype = self._normalize_battery_sub_type(data.get("operationModeSubType"))
+        profile = self._configured_profile_key(data.get("profile"))
+        if (
+            self._pending_reserve_readback is None
+            and self._pending_requires_authoritative_confirmation()
+        ):
+            reserve = self.profile_transition_reserve(data, profile)
+        else:
+            reserve = self.battery_reserve_readback(data, from_profile=True)
+        subtype = (
+            self._reserve_observed_subtype(data.get("operationModeSubType")) or None
+        )
         polling_interval = self._coerce_optional_int(data.get("pollingInterval"))
         supports_mqtt = self._coerce_optional_bool(data.get("supportsMqtt"))
         evse_storm_enabled = self._coerce_optional_bool(data.get("evseStormEnabled"))
@@ -2849,23 +3277,23 @@ class BatteryRuntime:
 
         self.profile_mismatch.note_configured(profile)
         stale_profile_read = self._read_profile_is_stale_after_write(profile)
-        if profile is not None and not stale_profile_read:
-            state._battery_profile = profile
-            self._note_authoritative_profile_read(profile)
+        if stale_profile_read:
+            if self._pending_reserve_readback is not None:
+                self._discard_conflicting_reserve_subtypes(None)
+        else:
+            if profile is not None:
+                state._battery_profile = profile
+                self._note_authoritative_profile_read(profile)
+            self._note_profile_reserve_readback(data, profile)
         if reserve is not None and not stale_profile_read:
-            normalized_reserve = self.normalize_battery_reserve_for_profile(
-                profile or state._battery_profile or "self-consumption",
-                reserve,
-            )
-            state._battery_backup_percentage = normalized_reserve
-            self.remember_battery_reserve(
-                profile or state._battery_profile, normalized_reserve
-            )
+            state._battery_backup_percentage = reserve
+            self.remember_battery_reserve(profile or state._battery_profile, reserve)
         if subtype is not None and not stale_profile_read:
             state._battery_operation_mode_sub_type = subtype
         elif not stale_profile_read and (
             data.get("operationModeSubType") == ""
-            or profile not in {"cost_savings", "ai_optimisation"}
+            or (profile or state._battery_profile)
+            not in {"cost_savings", "ai_optimisation"}
         ):
             state._battery_operation_mode_sub_type = None
         if supports_mqtt is not None:
@@ -2885,11 +3313,16 @@ class BatteryRuntime:
             state._battery_profile_devices_last_success_mono = time.monotonic()
         if profile_evse_device is not None:
             state._battery_profile_evse_device = profile_evse_device
-        self.sync_backend_battery_profile_pending(data.get("isBatteryChangePending"))
+        # A partial Profile response can leave the optimistic reserve in the cache.
+        self.sync_backend_battery_profile_pending(
+            data.get("isBatteryChangePending"), profile_reserve=reserve
+        )
 
         if (
             self.effective_profile_matches_pending()
-            and self._pending_authoritative_confirmation_received()
+            and self._pending_authoritative_confirmation_received(
+                profile_reserve=reserve
+            )
         ):
             self.confirm_battery_pending()
 
@@ -3197,6 +3630,7 @@ class BatteryRuntime:
         clear_missing_reserve_bounds: bool = True,
         clear_missing_controls: bool = False,
         settings_read_started: float | None = None,
+        settings_read_is_latest: bool = True,
     ) -> None:
         state = self.battery_state
         if not isinstance(payload, dict):
@@ -3253,15 +3687,18 @@ class BatteryRuntime:
         self.remember_previous_battery_reserves(
             data.get("previousBatteryBackupPercentage")
         )
-        settings_profile = self.normalize_battery_profile_key(data.get("profile"))
-        profile_write_awaiting_authoritative_read = (
-            self._pending_requires_authoritative_confirmation()
+        raw_profile = data.get("profile")
+        settings_profile = self._configured_profile_key(raw_profile)
+        unrelated_settings_profile = (
+            self._settings_profile_is_stale_after_authoritative_read(settings_profile)
+        )
+        profile_readback_allowed = (
+            settings_read_started is None or self.settings_profile_readback_allowed
         )
         stale_profile_read = (
-            profile_write_awaiting_authoritative_read
-            or self._settings_profile_is_stale_after_authoritative_read(
-                settings_profile
-            )
+            self._pending_requires_authoritative_confirmation()
+            or unrelated_settings_profile
+            or not profile_readback_allowed
         )
         if (
             settings_profile is not None
@@ -3271,10 +3708,8 @@ class BatteryRuntime:
                 or not self._profile_authoritative_read_is_fresh()
             )
         ):
+            self._discard_reserve_readback_for_other_profiles(settings_profile)
             state._battery_profile = settings_profile
-        settings_reserve = self._coerce_optional_int(
-            data.get("batteryBackupPercentage")
-        )
         settings_reserve_min = self._coerce_optional_int(
             data.get("batteryBackupPercentageMin")
         )
@@ -3287,25 +3722,58 @@ class BatteryRuntime:
         settings_reserve_max = self._coerce_optional_int(
             data.get("batteryBackupPercentageMax")
         )
+        reserve_pending = self._pending_reserve_readback is not None
+        settings_bounds_match = (
+            settings_profile in (None, state._battery_pending_profile)
+            if reserve_pending
+            else not unrelated_settings_profile
+        )
+        if (
+            settings_read_started is not None
+            and settings_read_is_latest
+            and not self._reserve_write_in_flight
+            and (profile_readback_allowed or reserve_pending)
+            and (raw_profile is None or settings_profile is not None)
+            and settings_bounds_match
+        ):
+            self._note_settings_reserve_limits(
+                settings_profile,
+                settings_reserve_min,
+                settings_reserve_max,
+                very_low_soc_min,
+            )
+            if not stale_profile_read:
+                subtype = self._reserve_observed_subtype(
+                    data.get("operationModeSubType")
+                )
+                if subtype is not None:
+                    if settings_profile is not None:
+                        if not self._profile_reserve_subtype_is_fresh(settings_profile):
+                            self._discard_conflicting_reserve_subtypes(subtype)
+                        self._settings_reserve_subtype = (settings_profile, subtype)
+                    else:
+                        self._discard_conflicting_settings_subtype(subtype)
         if settings_reserve_max is not None:
             state._battery_backup_percentage_max = max(
                 0, min(100, int(settings_reserve_max))
             )
         elif clear_missing_reserve_bounds:
             state._battery_backup_percentage_max = None
+        settings_reserve = self.battery_reserve_readback(data, from_profile=False)
         if settings_reserve is not None and not stale_profile_read:
-            state._battery_backup_percentage = (
-                self.normalize_battery_reserve_for_profile(
-                    settings_profile or state._battery_profile or "self-consumption",
-                    settings_reserve,
+            configured_profile = settings_profile or state._battery_profile
+            if configured_profile == "backup_only":
+                settings_reserve = 100
+            elif settings_read_started is None:
+                settings_reserve = self.normalize_battery_reserve_for_profile(
+                    configured_profile or "self-consumption", settings_reserve
                 )
-            )
+            state._battery_backup_percentage = settings_reserve
             self.remember_battery_reserve(
-                settings_profile or state._battery_profile,
-                state._battery_backup_percentage,
+                settings_profile or state._battery_profile, settings_reserve
             )
-        settings_subtype = self._normalize_battery_sub_type(
-            data.get("operationModeSubType")
+        settings_subtype = (
+            self._reserve_observed_subtype(data.get("operationModeSubType")) or None
         )
         if settings_subtype is not None and not stale_profile_read:
             state._battery_operation_mode_sub_type = settings_subtype
@@ -3821,6 +4289,9 @@ class BatteryRuntime:
             return False
         ev_generation = self.ev_preferences.generation
         read_generation = getattr(state, "_battery_profile_read_generation", 0)
+        profile_readback_allowed = self._pending_reserve_readback is None
+        self._settings_read_sequence += 1
+        request_sequence = self._settings_read_sequence
         self._settings_reads_in_flight += 1
         try:
             payload = await fetcher()
@@ -3849,11 +4320,23 @@ class BatteryRuntime:
             state._battery_settings_payload = redacted_payload
         else:
             state._battery_settings_payload = {"value": redacted_payload}
+        # Concurrent periodic and Repair reads can complete out of order.
+        settings_read_is_latest = (
+            request_sequence > self._latest_settings_profile_response
+        )
+        if settings_read_is_latest:
+            self._latest_settings_profile_response = request_sequence
+        self.settings_profile_readback_allowed = (
+            profile_readback_allowed
+            and settings_read_is_latest
+            and not self._reserve_write_in_flight
+        )
         self.parse_battery_settings_payload(
             payload,
             clear_missing_schedule_times=True,
             clear_missing_controls=True,
             settings_read_started=now,
+            settings_read_is_latest=settings_read_is_latest,
         )
         self.sync_cfg_settings_pending()
         success_ttl = self._battery_control_refresh_success_ttl_seconds(
@@ -4418,15 +4901,15 @@ class BatteryRuntime:
         self.sync_storm_guard_pending(storm_state)
         if evse is not None:
             state._storm_evse_enabled = evse
-        state._storm_guard_cache_until = now + (
-            self._battery_profile_refresh_cache_ttl_seconds(STORM_GUARD_CACHE_TTL)
+        # A reserve sample received during a PUT was held back. If the PUT
+        # fails, the next normal poll can collect usable feedback.
+        success_ttl = (
+            0.0
+            if self._reserve_write_in_flight
+            else self._battery_profile_refresh_cache_ttl_seconds(STORM_GUARD_CACHE_TTL)
         )
-        self.health.note_endpoint_family_success(
-            family,
-            success_ttl_s=self._battery_profile_refresh_cache_ttl_seconds(
-                STORM_GUARD_CACHE_TTL
-            ),
-        )
+        state._storm_guard_cache_until = now + success_ttl
+        self.health.note_endpoint_family_success(family, success_ttl_s=success_ttl)
         if repair:
             if system_task is True:
                 self._repair_profile_started = now
@@ -4521,6 +5004,11 @@ class BatteryRuntime:
         if runtime:
             runtime.set_requested(
                 "battery_reserve", {"reserve": normalized, "profile_ready": True}
+            )
+            # Seed the reserve-owned companion with the accepted configured
+            # mode, even if the preceding legacy hold saw a partial read.
+            self.reserve_companion_profile_at_submission = (
+                self.battery_state._battery_profile
             )
         await self.async_apply_battery_reserve_only(
             profile=profile,

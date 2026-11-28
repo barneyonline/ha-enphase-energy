@@ -2,7 +2,7 @@
 
 from datetime import time as dt_time
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import ANY, AsyncMock, Mock
 import asyncio
 
 import pytest
@@ -190,7 +190,8 @@ async def test_endpoint_success_cache_and_failure_are_distinguished(tracker):
     coord._battery_profile = "self-consumption"
     coord._battery_settings_payload = {"profile": "self-consumption"}
     coord.battery_runtime = SimpleNamespace(
-        normalize_battery_profile_key=lambda value: value
+        normalize_battery_profile_key=lambda value: value,
+        settings_profile_readback_allowed=True,
     )
     coord.battery_profile_pending = False
     health = SimpleNamespace(request_count=0, consecutive_failures=0)
@@ -1195,10 +1196,13 @@ def test_battery_reserve_number_exposes_owning_transaction(
 
 
 def test_battery_reserve_number_without_control_tracker(coordinator_factory):
+    from custom_components.enphase_ev.control_values import fresh_control_values
     from custom_components.enphase_ev.number import BatteryReserveNumber
 
     coord = coordinator_factory()
     coord.control_updates = None
+    coord._battery_settings_payload = {"batteryBackupPercentage": "invalid"}
+    assert fresh_control_values(coord, "battery_reserve", "battery_settings") == {}
     assert BatteryReserveNumber(coord).extra_state_attributes == {
         "reserve_source": "battery_config",
         "pending": False,
@@ -1245,7 +1249,10 @@ async def test_battery_reserve_keeps_backend_pending_after_local_confirmation(
         "control_update_status": "confirmed",
     }
     coord.client.set_battery_settings_compat.assert_awaited_once_with(
-        {"batteryBackupPercentage": 25}, merged_payload=True, strip_devices=True
+        {"batteryBackupPercentage": 25},
+        merged_payload=True,
+        strip_devices=True,
+        on_accepted_profile=ANY,
     )
 
     payload["data"]["isBatteryChangePending"] = False
@@ -1314,7 +1321,10 @@ async def test_battery_reserve_number_compares_confirmed_value(
         await number.async_set_native_value(25)
 
         coord.client.set_battery_settings_compat.assert_awaited_once_with(
-            {"batteryBackupPercentage": 25}, merged_payload=True, strip_devices=True
+            {"batteryBackupPercentage": 25},
+            merged_payload=True,
+            strip_devices=True,
+            on_accepted_profile=ANY,
         )
         retry = ledger.updates[("battery_reserve", None)]
         assert retry is not update
@@ -1581,6 +1591,38 @@ async def test_profile_confirmation_keeps_unread_companion_values(
     )
     await coord.battery_runtime.async_refresh_battery_settings(force=True)
     assert BatteryReserveNumber(coord).native_value == 95
+
+
+@pytest.mark.asyncio
+async def test_pending_profile_ignores_invalid_companion_reserve(coordinator_factory):
+    from custom_components.enphase_ev.number import BatteryReserveNumber
+
+    coord = coordinator_factory()
+    runtime = coord.battery_runtime
+    runtime.parse_battery_profile_payload(
+        {"data": {"profile": "self-consumption", "batteryBackupPercentage": 20}}
+    )
+    coord._battery_show_full_backup = True
+    coord._battery_show_battery_backup_percentage = True
+    coord._battery_user_is_owner = True
+    coord.client.set_battery_profile = AsyncMock(return_value={"message": "success"})
+    coord.async_request_refresh = AsyncMock()
+    await runtime.async_set_system_profile("backup_only")
+
+    coord.client.storm_guard_profile = AsyncMock(
+        return_value={
+            "data": {
+                "profile": "self-consumption",
+                "batteryBackupPercentage": 101,
+                "isBatteryChangePending": True,
+            }
+        }
+    )
+    await runtime.async_refresh_storm_guard_profile(force=True)
+
+    assert coord.battery_profile_pending
+    assert coord.control_updates.status() == "pending"
+    assert BatteryReserveNumber(coord).native_value == 20
 
 
 @pytest.mark.asyncio
@@ -2001,7 +2043,10 @@ async def test_profile_follow_up_uses_confirmed_companions_after_timeout(
         coord.client.set_battery_settings_compat = AsyncMock()
         await coord.battery_runtime.async_set_battery_reserve(25)
         coord.client.set_battery_settings_compat.assert_awaited_once_with(
-            {"batteryBackupPercentage": 25}, merged_payload=True, strip_devices=True
+            {"batteryBackupPercentage": 25},
+            merged_payload=True,
+            strip_devices=True,
+            on_accepted_profile=ANY,
         )
         assert coord.battery_pending_profile == "cost_savings"
     else:

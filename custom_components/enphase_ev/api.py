@@ -1191,6 +1191,7 @@ class EnphaseEVClient(MqttStreamSurface):
         supports_mqtt: bool | None = None,
         strip_devices: bool = False,
         partial_payload_only: bool = False,
+        on_accepted_profile: Callable[[object, object], None] | None = None,
     ) -> JsonDict:
         "Issue a BatteryConfig write using endpoint-specific compatibility attempts."
 
@@ -1206,6 +1207,7 @@ class EnphaseEVClient(MqttStreamSurface):
             supports_mqtt=supports_mqtt,
             strip_devices=strip_devices,
             partial_payload_only=partial_payload_only,
+            on_accepted_profile=on_accepted_profile,
         )
 
     @staticmethod
@@ -1940,6 +1942,7 @@ class EnphaseEVClient(MqttStreamSurface):
         merged_payload: bool = False,
         strip_devices: bool = False,
         partial_payload_only: bool = False,
+        on_accepted_profile: Callable[[object, object], None] | None = None,
     ) -> JsonDict:
         "Update battery settings using an explicit compatibility payload shape."
 
@@ -1951,6 +1954,7 @@ class EnphaseEVClient(MqttStreamSurface):
             merged_payload=merged_payload,
             strip_devices=strip_devices,
             partial_payload_only=partial_payload_only,
+            on_accepted_profile=on_accepted_profile,
         )
 
     async def set_battery_profile(
